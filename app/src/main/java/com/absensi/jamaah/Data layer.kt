@@ -17,9 +17,9 @@ data class Jamaah(
 data class Absensi(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val jamaahId: Int,
-    val tanggal: String, // Format: YYYY-MM-DD
-    val waktuShalat: String, // Subuh, Dzuhur, Ashar, Maghrib, Isya
-    val status: String, // Mengikuti, Ijin, Tidak Mengikuti, Telat
+    val tanggal: String, 
+    val waktuShalat: String, 
+    val status: String, 
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -39,6 +39,10 @@ interface AppDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAbsensiList(absensi: List<Absensi>)
+
+    // FUNGSI BARU UNTUK EDIT DATA
+    @Update
+    suspend fun updateAbsensi(absensi: Absensi)
 
     @Query("SELECT * FROM absensi")
     fun getAllAbsensi(): Flow<List<Absensi>>
@@ -67,7 +71,6 @@ abstract class AppDatabase : RoomDatabase() {
                 ).addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                         super.onCreate(db)
-                        // Dummy Data
                         Executors.newSingleThreadExecutor().execute {
                             val dao = getDatabase(context).appDao()
                             val dummies = listOf(
