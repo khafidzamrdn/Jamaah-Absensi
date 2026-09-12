@@ -8,6 +8,7 @@ import java.util.concurrent.Executors
 @Entity(tableName = "jamaah")
 data class Jamaah(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val idSantri: String, // KOLOM BARU UNTUK QR
     val nama: String,
     val kelas: String,
     val alamat: String
@@ -31,6 +32,9 @@ interface AppDao {
     @Insert
     suspend fun insertJamaah(jamaah: Jamaah)
 
+    @Update
+    suspend fun updateJamaah(jamaah: Jamaah)
+
     @Delete
     suspend fun deleteJamaah(jamaah: Jamaah)
 
@@ -40,7 +44,6 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAbsensiList(absensi: List<Absensi>)
 
-    // FUNGSI BARU UNTUK EDIT DATA
     @Update
     suspend fun updateAbsensi(absensi: Absensi)
 
@@ -54,7 +57,8 @@ interface AppDao {
     suspend fun clearAbsensi()
 }
 
-@Database(entities = [Jamaah::class, Absensi::class], version = 1, exportSchema = false)
+// Versi database naik jadi 2 agar tidak error saat update
+@Database(entities = [Jamaah::class, Absensi::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appDao(): AppDao
 
@@ -68,20 +72,22 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "absensi_database"
-                ).addCallback(object : RoomDatabase.Callback() {
+                )
+                .fallbackToDestructiveMigration() // Reset otomatis karena tabel berubah
+                .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                         super.onCreate(db)
                         Executors.newSingleThreadExecutor().execute {
                             val dao = getDatabase(context).appDao()
                             val dummies = listOf(
-                                Jamaah(nama = "Ahmad", kelas = "A", alamat = "Pondok 1"),
-                                Jamaah(nama = "Muhammad Rizky", kelas = "A", alamat = "Pondok 2"),
-                                Jamaah(nama = "Fajar", kelas = "B", alamat = "Pondok 1"),
-                                Jamaah(nama = "Ilham", kelas = "C", alamat = "Pondok 3"),
-                                Jamaah(nama = "Bagas", kelas = "B", alamat = "Pondok 2")
+                                Jamaah(idSantri = "QR001", nama = "Ahmad", kelas = "A", alamat = "Pondok 1"),
+                                Jamaah(idSantri = "QR002", nama = "Muhammad Rizky", kelas = "A", alamat = "Pondok 2"),
+                                Jamaah(idSantri = "QR003", nama = "Fajar", kelas = "B", alamat = "Pondok 1"),
+                                Jamaah(idSantri = "QR004", nama = "Ilham", kelas = "C", alamat = "Pondok 3"),
+                                Jamaah(idSantri = "QR005", nama = "Bagas", kelas = "B", alamat = "Pondok 2")
                             )
                             dummies.forEach { 
-                                val query = "INSERT INTO jamaah (nama, kelas, alamat) VALUES ('${it.nama}', '${it.kelas}', '${it.alamat}')"
+                                val query = "INSERT INTO jamaah (idSantri, nama, kelas, alamat) VALUES ('${it.idSantri}', '${it.nama}', '${it.kelas}', '${it.alamat}')"
                                 db.execSQL(query)
                             }
                         }
