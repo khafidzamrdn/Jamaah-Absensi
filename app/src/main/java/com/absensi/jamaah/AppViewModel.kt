@@ -39,11 +39,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // FUNGSI BARU UNTUK EDIT DATA
+    fun perbaruiAbsensi(absensi: Absensi) {
+        viewModelScope.launch {
+            dao.updateAbsensi(absensi)
+        }
+    }
+
     fun resetData() {
         viewModelScope.launch {
             dao.clearAbsensi()
             dao.clearJamaah()
-            // Re-insert dummy
             val dummies = listOf(
                 Jamaah(nama = "Ahmad", kelas = "A", alamat = "Pondok 1"),
                 Jamaah(nama = "Muhammad Rizky", kelas = "A", alamat = "Pondok 2"),
