@@ -92,11 +92,26 @@ fun AbsensiScreen(viewModel: AppViewModel) {
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(jamaahList) { jamaah ->
                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text("${jamaah.nama} (${jamaah.kelas})", style = MaterialTheme.typography.titleMedium)
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                listOf("Mengikuti", "Ijin", "Tidak Mengikuti", "Telat").forEach { status ->
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("${jamaah.nama} (${jamaah.kelas})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Baris 1: Mengikuti & Ijin
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                listOf("Mengikuti", "Ijin").forEach { status ->
+                                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(
+                                            selected = absensiState[jamaah.id] == status,
+                                            onClick = { absensiState[jamaah.id] = status }
+                                        )
+                                        Text(status, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                            // Baris 2: Tidak Mengikuti & Telat
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                listOf("Tidak Mengikuti", "Telat").forEach { status ->
+                                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                                         RadioButton(
                                             selected = absensiState[jamaah.id] == status,
                                             onClick = { absensiState[jamaah.id] = status }
@@ -120,7 +135,6 @@ fun AbsensiScreen(viewModel: AppViewModel) {
             }
         }
     }
-}
 
 @Composable
 fun RekapScreen(viewModel: AppViewModel) {
