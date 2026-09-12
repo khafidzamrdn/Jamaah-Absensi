@@ -17,16 +17,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val absensiList: StateFlow<List<Absensi>> = dao.getAllAbsensi()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    fun tambahJamaah(nama: String, kelas: String, alamat: String) {
+    fun tambahJamaah(idSantri: String, nama: String, kelas: String, alamat: String) {
         viewModelScope.launch {
-            dao.insertJamaah(Jamaah(nama = nama, kelas = kelas, alamat = alamat))
+            dao.insertJamaah(Jamaah(idSantri = idSantri, nama = nama, kelas = kelas, alamat = alamat))
         }
     }
 
+    fun perbaruiJamaah(jamaah: Jamaah) {
+        viewModelScope.launch { dao.updateJamaah(jamaah) }
+    }
+
     fun hapusJamaah(jamaah: Jamaah) {
-        viewModelScope.launch {
-            dao.deleteJamaah(jamaah)
-        }
+        viewModelScope.launch { dao.deleteJamaah(jamaah) }
     }
 
     suspend fun cekAbsensiAda(tanggal: String, waktu: String): Boolean {
@@ -34,15 +36,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun simpanAbsensi(absensi: List<Absensi>) {
-        viewModelScope.launch {
-            dao.insertAbsensiList(absensi)
+        viewModelScope.launch { dao.insertAbsensiList(absensi) }
+    }
+
+    fun perbaruiAbsensi(absensi: Absensi) {
+        viewModelScope.launch { dao.updateAbsensi(absensi) }
+    }
+
+    // --- LOGIKA SCAN QR ---
+    suspend fun siapkanAbsensiScan(tanggal: String, waktu: String) {
+        val sudahAda = dao.getAbsensiByTanggalWaktu(tanggal, waktu)
+        if (sudahAda.isEmpty()) {
+            // Set semua default "Tidak Mengikuti"
+            val dataToSave = jamaahList.value.map {
+                Absensi(jamaahId = it.id, tanggal = tanggal, waktuShalat = waktu, status = "Tidak Mengikuti")
+            }
+            dao.insertAbsensiList(dataToSave)
         }
     }
 
-    // FUNGSI BARU UNTUK EDIT DATA
-    fun perbaruiAbsensi(absensi: Absensi) {
-        viewModelScope.launch {
-            dao.updateAbsensi(absensi)
+    suspend fun prosesScanQr(idHasilScan: String, tanggal: String, waktu: String): String {
+        val jamaah = jamaahList.value.find { it.idSantri == idHasilScan }
+        if (jamaah == null) return "❌ ID QR '$idHasilScan' tidak terdaftar."
+
+        val absensiSesi = dao.getAbsensiByTanggalWaktu(tanggal, waktu)
+        val absenJamaah = absensiSesi.find { it.jamaahId == jamaah.id }
+
+        return if (absenJamaah != null) {
+            dao.updateAbsensi(absenJamaah.copy(status = "Mengikuti"))
+            "✅ ${jamaah.nama} hadir!"
+        } else {
+            "❌ Sesi absen belum disiapkan."
         }
     }
 
@@ -51,11 +75,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             dao.clearAbsensi()
             dao.clearJamaah()
             val dummies = listOf(
-                Jamaah(nama = "Ahmad", kelas = "A", alamat = "Pondok 1"),
-                Jamaah(nama = "Muhammad Rizky", kelas = "A", alamat = "Pondok 2"),
-                Jamaah(nama = "Fajar", kelas = "B", alamat = "Pondok 1"),
-                Jamaah(nama = "Ilham", kelas = "C", alamat = "Pondok 3"),
-                Jamaah(nama = "Bagas", kelas = "B", alamat = "Pondok 2")
+                Jamaah(idSantri = "QR001", nama = "Ahmad", kelas = "A", alamat = "Pondok 1"),
+                Jamaah(idSantri = "QR002", nama = "Muhammad Rizky", kelas = "A", alamat = "Pondok 2"),
+                Jamaah(idSantri = "QR003", nama = "Fajar", kelas = "B", alamat = "Pondok 1"),
+                Jamaah(idSantri = "QR004", nama = "Ilham", kelas = "C", alamat = "Pondok 3"),
+                Jamaah(idSantri = "QR005", nama = "Bagas", kelas = "B", alamat = "Pondok 2")
             )
             dummies.forEach { dao.insertJamaah(it) }
         }
