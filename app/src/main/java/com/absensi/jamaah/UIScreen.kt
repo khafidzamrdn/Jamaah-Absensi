@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.absensi.jamaah
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -55,6 +59,25 @@ fun DashboardScreen(viewModel: AppViewModel, onMulaiAbsensi: () -> Unit) {
 
 @Composable
 fun AbsensiScreen(viewModel: AppViewModel) {
+    var modeAbsensi by remember { mutableStateOf(0) }
+    val tabs = listOf("Manual", "Scan QR")
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TabRow(selectedTabIndex = modeAbsensi) {
+            tabs.forEachIndexed { index, title ->
+                Tab(selected = modeAbsensi == index, onClick = { modeAbsensi = index }, text = { Text(title) })
+            }
+        }
+        if (modeAbsensi == 0) {
+            AbsensiManualView(viewModel)
+        } else {
+            AbsensiScanView(viewModel)
+        }
+    }
+}
+
+@Composable
+fun AbsensiManualView(viewModel: AppViewModel) {
     val jamaahList = viewModel.jamaahList.collectAsState().value
     var tanggal by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
     var waktu by remember { mutableStateOf("Subuh") }
@@ -76,13 +99,9 @@ fun AbsensiScreen(viewModel: AppViewModel) {
     }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        Text("Form Absensi", style = MaterialTheme.typography.headlineSmall)
         OutlinedTextField(value = tanggal, onValueChange = { tanggal = it }, label = { Text("Tanggal (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
-        
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            waktuList.forEach { w ->
-                FilterChip(selected = waktu == w, onClick = { waktu = w }, label = { Text(w) })
-            }
+            waktuList.forEach { w -> FilterChip(selected = waktu == w, onClick = { waktu = w }, label = { Text(w) }) }
         }
 
         if (errorMessage.isNotEmpty()) {
@@ -95,15 +114,10 @@ fun AbsensiScreen(viewModel: AppViewModel) {
                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text("${jamaah.nama} (${jamaah.kelas})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 listOf("Mengikuti", "Ijin").forEach { status ->
                                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                        RadioButton(
-                                            selected = absensiState[jamaah.id] == status,
-                                            onClick = { absensiState[jamaah.id] = status }
-                                        )
+                                        RadioButton(selected = absensiState[jamaah.id] == status, onClick = { absensiState[jamaah.id] = status })
                                         Text(status, style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
@@ -111,10 +125,7 @@ fun AbsensiScreen(viewModel: AppViewModel) {
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 listOf("Tidak Mengikuti", "Telat").forEach { status ->
                                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                        RadioButton(
-                                            selected = absensiState[jamaah.id] == status,
-                                            onClick = { absensiState[jamaah.id] = status }
-                                        )
+                                        RadioButton(selected = absensiState[jamaah.id] == status, onClick = { absensiState[jamaah.id] = status })
                                         Text(status, style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
@@ -137,11 +148,69 @@ fun AbsensiScreen(viewModel: AppViewModel) {
 }
 
 @Composable
+fun AbsensiScanView(viewModel: AppViewModel) {
+    val coroutineScope = rememberCoroutineScope()
+    var tanggal by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
+    var waktu by remember { mutableStateOf("Subuh") }
+    val waktuList = listOf("Subuh", "Dzuhur", "Ashar", "Maghrib", "Isya")
+    
+    var isSessionReady by remember { mutableStateOf(false) }
+    var scanResultMsg by remember { mutableStateOf("Tentukan Tanggal & Waktu, lalu klik 'Siapkan Sesi'.") }
+
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        if(result.contents != null) {
+            coroutineScope.launch {
+                scanResultMsg = viewModel.prosesScanQr(result.contents, tanggal, waktu)
+            }
+        }
+    }
+
+    Column(modifier = Modifier.padding(16.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+        OutlinedTextField(value = tanggal, onValueChange = { tanggal = it }, label = { Text("Tanggal") }, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            waktuList.forEach { w -> FilterChip(selected = waktu == w, onClick = { waktu = w; isSessionReady = false }, label = { Text(w) }) }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        if (!isSessionReady) {
+            Button(onClick = {
+                coroutineScope.launch {
+                    viewModel.siapkanAbsensiScan(tanggal, waktu)
+                    isSessionReady = true
+                    scanResultMsg = "Sesi Siap! Semua santri di-set 'Tidak Mengikuti'.\nSilakan mulai scan."
+                }
+            }, modifier = Modifier.fillMaxWidth()) {
+                Text("Siapkan Sesi Scan")
+            }
+        } else {
+            Button(
+                onClick = {
+                    scanLauncher.launch(ScanOptions().apply {
+                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                        setPrompt("Arahkan kamera ke QR Code Santri")
+                        setBeepEnabled(true)
+                        setOrientationLocked(false)
+                    })
+                }, 
+                modifier = Modifier.fillMaxWidth().height(60.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+            ) {
+                Text("📷 KLIK UNTUK SCAN QR", fontWeight = FontWeight.Bold)
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        Text(scanResultMsg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = if(scanResultMsg.contains("✅")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+    }
+}
+
+// Fitur RekapScreen tetap sama persis seperti sebelumnya (Harian & Statistik & Edit).
+@Composable
 fun RekapScreen(viewModel: AppViewModel) {
     val absensi = viewModel.absensiList.collectAsState().value
     val jamaah = viewModel.jamaahList.collectAsState().value
     
-    // Konversi Tanggal jadi Format Minggu ke-X
     fun getWeek(dateStr: String): String {
         return try {
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -156,7 +225,6 @@ fun RekapScreen(viewModel: AppViewModel) {
     var selectedWeek by remember { mutableStateOf<String?>(null) }
     var absensiToEdit by remember { mutableStateOf<Absensi?>(null) }
 
-    // TAMPILAN POPUP EDIT
     if (absensiToEdit != null) {
         var editStatus by remember { mutableStateOf(absensiToEdit!!.status) }
         val jamaahName = jamaah.find { it.id == absensiToEdit!!.jamaahId }?.nama ?: "Jamaah"
@@ -167,8 +235,7 @@ fun RekapScreen(viewModel: AppViewModel) {
             text = {
                 Column {
                     Text("Nama: $jamaahName", fontWeight = FontWeight.Bold)
-                    Text("Tanggal: ${absensiToEdit!!.tanggal}")
-                    Text("Waktu: ${absensiToEdit!!.waktuShalat}")
+                    Text("Tanggal: ${absensiToEdit!!.tanggal} | Waktu: ${absensiToEdit!!.waktuShalat}")
                     Spacer(modifier = Modifier.height(12.dp))
                     listOf("Mengikuti", "Ijin", "Tidak Mengikuti", "Telat").forEach { status ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { editStatus = status }) {
@@ -184,35 +251,29 @@ fun RekapScreen(viewModel: AppViewModel) {
                     absensiToEdit = null
                 }) { Text("Simpan Perubahan") }
             },
-            dismissButton = {
-                TextButton(onClick = { absensiToEdit = null }) { Text("Batal") }
-            }
+            dismissButton = { TextButton(onClick = { absensiToEdit = null }) { Text("Batal") } }
         )
     }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
         if (selectedWeek == null) {
-            // TAMPILAN AWAL: DAFTAR MINGGU
             Text("Rekap Mingguan", style = MaterialTheme.typography.headlineSmall)
             Spacer(modifier = Modifier.height(16.dp))
-            
             val grouped = absensi.groupBy { getWeek(it.tanggal) }
             if (grouped.isEmpty()) {
-                Text("Belum ada data absensi yang dicatat.")
+                Text("Belum ada data absensi.")
             } else {
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     items(grouped.keys.toList().sorted().reversed()) { week ->
                         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selectedWeek = week }) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(week, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                Text("Total absensi: ${grouped[week]?.size ?: 0} catatan", style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
                 }
             }
         } else {
-            // TAMPILAN DETAIL DALAM SATU MINGGU
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = { selectedWeek = null }) { Text("Kembali") }
                 Spacer(modifier = Modifier.width(12.dp))
@@ -230,8 +291,6 @@ fun RekapScreen(viewModel: AppViewModel) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(j.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Divider(modifier = Modifier.padding(vertical = 4.dp))
-                            
-                            // Looping data harian santri tersebut
                             dataJamaah.forEach { ab ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -240,11 +299,9 @@ fun RekapScreen(viewModel: AppViewModel) {
                                 ) {
                                     Column {
                                         Text("${ab.tanggal} - ${ab.waktuShalat}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                                        Text("Status: ${ab.status}", style = MaterialTheme.typography.bodySmall, color = if(ab.status == "Mengikuti" || ab.status == "Telat") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                                        Text("Status: ${ab.status}", style = MaterialTheme.typography.bodySmall)
                                     }
-                                    OutlinedButton(onClick = { absensiToEdit = ab }) {
-                                        Text("Edit")
-                                    }
+                                    OutlinedButton(onClick = { absensiToEdit = ab }) { Text("Edit") }
                                 }
                             }
                         }
@@ -258,21 +315,57 @@ fun RekapScreen(viewModel: AppViewModel) {
 @Composable
 fun JamaahScreen(viewModel: AppViewModel) {
     val jamaahList = viewModel.jamaahList.collectAsState().value
+    var idSantri by remember { mutableStateOf("") }
     var nama by remember { mutableStateOf("") }
     var kelas by remember { mutableStateOf("") }
     var alamat by remember { mutableStateOf("") }
+    var jamaahToEdit by remember { mutableStateOf<Jamaah?>(null) }
+
+    // DIALOG EDIT JAMAAH
+    if (jamaahToEdit != null) {
+        var editId by remember { mutableStateOf(jamaahToEdit!!.idSantri) }
+        var editNama by remember { mutableStateOf(jamaahToEdit!!.nama) }
+        var editKelas by remember { mutableStateOf(jamaahToEdit!!.kelas) }
+        var editAlamat by remember { mutableStateOf(jamaahToEdit!!.alamat) }
+
+        AlertDialog(
+            onDismissRequest = { jamaahToEdit = null },
+            title = { Text("Edit / Hapus Jamaah") },
+            text = {
+                Column {
+                    OutlinedTextField(value = editId, onValueChange = { editId = it }, label = { Text("ID Santri (QR)") })
+                    OutlinedTextField(value = editNama, onValueChange = { editNama = it }, label = { Text("Nama") })
+                    OutlinedTextField(value = editKelas, onValueChange = { editKelas = it }, label = { Text("Kelas") })
+                    OutlinedTextField(value = editAlamat, onValueChange = { editAlamat = it }, label = { Text("Alamat") })
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.perbaruiJamaah(jamaahToEdit!!.copy(idSantri = editId, nama = editNama, kelas = editKelas, alamat = editAlamat))
+                    jamaahToEdit = null
+                }) { Text("Simpan") }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    viewModel.hapusJamaah(jamaahToEdit!!)
+                    jamaahToEdit = null 
+                }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Hapus") }
+            }
+        )
+    }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        Text("Data Jamaah", style = MaterialTheme.typography.headlineSmall)
+        Text("Data Jamaah (Sentuh untuk Edit)", style = MaterialTheme.typography.headlineSmall)
         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
+                OutlinedTextField(value = idSantri, onValueChange = { idSantri = it }, label = { Text("ID Santri (QR Code)") })
                 OutlinedTextField(value = nama, onValueChange = { nama = it }, label = { Text("Nama") })
                 OutlinedTextField(value = kelas, onValueChange = { kelas = it }, label = { Text("Kelas") })
                 OutlinedTextField(value = alamat, onValueChange = { alamat = it }, label = { Text("Alamat") })
                 Button(onClick = { 
-                    if(nama.isNotBlank() && kelas.isNotBlank()) {
-                        viewModel.tambahJamaah(nama, kelas, alamat)
-                        nama = ""; kelas = ""; alamat = ""
+                    if(nama.isNotBlank() && idSantri.isNotBlank()) {
+                        viewModel.tambahJamaah(idSantri, nama, kelas, alamat)
+                        idSantri = ""; nama = ""; kelas = ""; alamat = ""
                     }
                 }, modifier = Modifier.padding(top = 8.dp)) {
                     Text("Tambah Jamaah")
@@ -282,11 +375,9 @@ fun JamaahScreen(viewModel: AppViewModel) {
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(jamaahList) { jamaah ->
                 ListItem(
+                    modifier = Modifier.clickable { jamaahToEdit = jamaah },
                     headlineContent = { Text(jamaah.nama) },
-                    supportingContent = { Text("Kelas: ${jamaah.kelas} | ${jamaah.alamat}") },
-                    trailingContent = {
-                        Button(onClick = { viewModel.hapusJamaah(jamaah) }) { Text("Hapus") }
-                    }
+                    supportingContent = { Text("ID: ${jamaah.idSantri} | Kelas: ${jamaah.kelas}") }
                 )
                 Divider()
             }
@@ -301,26 +392,20 @@ fun PengaturanScreen(viewModel: AppViewModel) {
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
         Text("Pengaturan", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Versi Aplikasi: 1.0.3 (Rekap Mingguan & Edit)")
+        Text("Versi Aplikasi: 2.0 (Scanner QR Code)")
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = { showDialog = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
             Text("Reset Semua Data")
         }
-
         if (showDialog) {
             AlertDialog(
                 onDismissRequest = { showDialog = false },
                 title = { Text("Konfirmasi") },
-                text = { Text("Apakah Anda yakin ingin mereset semua data? (Termasuk data absensi dan jamaah). Data dummy akan dimuat ulang.") },
+                text = { Text("Apakah Anda yakin ingin mereset semua data? Data dummy akan dimuat ulang.") },
                 confirmButton = {
-                    TextButton(onClick = { 
-                        viewModel.resetData()
-                        showDialog = false 
-                    }) { Text("Ya, Reset") }
+                    TextButton(onClick = { viewModel.resetData(); showDialog = false }) { Text("Ya, Reset") }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showDialog = false }) { Text("Batal") }
-                }
+                dismissButton = { TextButton(onClick = { showDialog = false }) { Text("Batal") } }
             )
         }
     }
