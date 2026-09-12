@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "687456974008",
+    "project_id": "absensi-jamaah-app",
+    "storage_bucket": "absensi-jamaah-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:687456974008:android:7a9f018082e31fbce1304d",
+        "android_client_info": {
+          "package_name": "com.absen.jamaah"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmYxaGqqNRXa7lVyzldHWH-bTa5nyDcE4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:687456974008:android:638932034488f87fe1304d",
+        "android_client_info": {
+          "package_name": "com.absensi.jamaah"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmYxaGqqNRXa7lVyzldHWH-bTa5nyDcE4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
