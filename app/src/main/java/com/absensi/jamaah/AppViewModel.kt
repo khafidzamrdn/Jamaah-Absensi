@@ -43,11 +43,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { dao.updateAbsensi(absensi) }
     }
 
-    // --- LOGIKA SCAN QR ---
     suspend fun siapkanAbsensiScan(tanggal: String, waktu: String) {
         val sudahAda = dao.getAbsensiByTanggalWaktu(tanggal, waktu)
         if (sudahAda.isEmpty()) {
-            // Set semua default "Tidak Mengikuti"
             val dataToSave = jamaahList.value.map {
                 Absensi(jamaahId = it.id, tanggal = tanggal, waktuShalat = waktu, status = "Tidak Mengikuti")
             }
@@ -55,18 +53,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // UPDATE: Penambahan fitur deteksi jika santri sudah absen
     suspend fun prosesScanQr(idHasilScan: String, tanggal: String, waktu: String): String {
         val jamaah = jamaahList.value.find { it.idSantri == idHasilScan }
-        if (jamaah == null) return "❌ ID QR '$idHasilScan' tidak terdaftar."
+        if (jamaah == null) return "❌ QR '$idHasilScan' tidak terdaftar."
 
         val absensiSesi = dao.getAbsensiByTanggalWaktu(tanggal, waktu)
         val absenJamaah = absensiSesi.find { it.jamaahId == jamaah.id }
 
         return if (absenJamaah != null) {
-            dao.updateAbsensi(absenJamaah.copy(status = "Mengikuti"))
-            "✅ ${jamaah.nama} hadir!"
+            if (absenJamaah.status == "Mengikuti") {
+                "⚠️ ${jamaah.nama} SUDAH absen."
+            } else {
+                dao.updateAbsensi(absenJamaah.copy(status = "Mengikuti"))
+                "✅ ${jamaah.nama} HADIR!"
+            }
         } else {
-            "❌ Sesi absen belum disiapkan."
+            "❌ Sesi belum disiapkan."
         }
     }
 
