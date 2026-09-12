@@ -1,7 +1,10 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.absensi.jamaah
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,10 +13,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.journeyapps.barcodescanner.BarcodeCallback
+import com.journeyapps.barcodescanner.BarcodeResult
+import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -60,7 +67,7 @@ fun DashboardScreen(viewModel: AppViewModel, onMulaiAbsensi: () -> Unit) {
 @Composable
 fun AbsensiScreen(viewModel: AppViewModel) {
     var modeAbsensi by remember { mutableStateOf(0) }
-    val tabs = listOf("Manual", "Scan QR")
+    val tabs = listOf("Manual", "Scan Kamera")
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = modeAbsensi) {
@@ -99,7 +106,7 @@ fun AbsensiManualView(viewModel: AppViewModel) {
     }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        OutlinedTextField(value = tanggal, onValueChange = { tanggal = it }, label = { Text("Tanggal (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = tanggal, onValueChange = { tanggal = it }, label = { Text("Tanggal") }, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             waktuList.forEach { w -> FilterChip(selected = waktu == w, onClick = { waktu = w }, label = { Text(w) }) }
         }
@@ -156,13 +163,15 @@ fun AbsensiScanView(viewModel: AppViewModel) {
     
     var isSessionReady by remember { mutableStateOf(false) }
     var scanResultMsg by remember { mutableStateOf("Tentukan Tanggal & Waktu, lalu klik 'Siapkan Sesi'.") }
+    var lastScanTime by remember { mutableStateOf(0L) }
 
-    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        if(result.contents != null) {
-            coroutineScope.launch {
-                scanResultMsg = viewModel.prosesScanQr(result.contents, tanggal, waktu)
-            }
-        }
+    // Meminta izin kamera secara langsung di dalam aplikasi
+    val context = LocalContext.current
+    var hasCameraPermission by remember { 
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) 
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { 
+        hasCameraPermission = it 
     }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -171,41 +180,73 @@ fun AbsensiScanView(viewModel: AppViewModel) {
             waktuList.forEach { w -> FilterChip(selected = waktu == w, onClick = { waktu = w; isSessionReady = false }, label = { Text(w) }) }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         
         if (!isSessionReady) {
             Button(onClick = {
                 coroutineScope.launch {
                     viewModel.siapkanAbsensiScan(tanggal, waktu)
                     isSessionReady = true
-                    scanResultMsg = "Sesi Siap! Semua santri di-set 'Tidak Mengikuti'.\nSilakan mulai scan."
+                    scanResultMsg = "Sesi Siap! Arahkan kamera ke QR Santri."
                 }
             }, modifier = Modifier.fillMaxWidth()) {
                 Text("Siapkan Sesi Scan")
             }
         } else {
-            Button(
-                onClick = {
-                    scanLauncher.launch(ScanOptions().apply {
-                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                        setPrompt("Arahkan kamera ke QR Code Santri")
-                        setBeepEnabled(true)
-                        setOrientationLocked(false)
-                    })
-                }, 
-                modifier = Modifier.fillMaxWidth().height(60.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-            ) {
-                Text("📷 KLIK UNTUK SCAN QR", fontWeight = FontWeight.Bold)
+            if (!hasCameraPermission) {
+                Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                    Text("Izinkan Akses Kamera")
+                }
+            } else {
+                // Kamera yang Tertanam di Layar (Continuous Scan)
+                Box(modifier = Modifier.fillMaxWidth().height(350.dp)) {
+                    AndroidView(
+                        factory = { ctx ->
+                            DecoratedBarcodeView(ctx).apply {
+                                setStatusText("") // Menghapus tulisan default
+                                resume() // Menyalakan kamera
+                            }
+                        },
+                        update = { view ->
+                            view.decodeContinuous(object : BarcodeCallback {
+                                override fun barcodeResult(result: BarcodeResult?) {
+                                    result?.text?.let { scannedId ->
+                                        val currentTime = System.currentTimeMillis()
+                                        // Jeda 2 detik (2000 ms) agar tidak nge-spam
+                                        if (currentTime - lastScanTime > 2000) {
+                                            lastScanTime = currentTime
+                                            coroutineScope.launch {
+                                                scanResultMsg = viewModel.prosesScanQr(scannedId, tanggal, waktu)
+                                            }
+                                        }
+                                    }
+                                }
+                                override fun possibleResultPoints(resultPoints: MutableList<com.google.zxing.ResultPoint>?) {}
+                            })
+                        },
+                        onRelease = { view ->
+                            view.pause() // Mematikan kamera jika halaman ditutup
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = { isSessionReady = false }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                    Text("Hentikan Kamera")
+                }
             }
         }
         
-        Spacer(modifier = Modifier.height(32.dp))
-        Text(scanResultMsg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = if(scanResultMsg.contains("✅")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+        Spacer(modifier = Modifier.height(24.dp))
+        // Menampilkan Notifikasi Hasil Scan
+        Text(
+            text = scanResultMsg, 
+            style = MaterialTheme.typography.titleLarge, 
+            fontWeight = FontWeight.Bold, 
+            color = if(scanResultMsg.contains("✅")) MaterialTheme.colorScheme.primary else if(scanResultMsg.contains("⚠️")) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+        )
     }
 }
 
-// Fitur RekapScreen tetap sama persis seperti sebelumnya (Harian & Statistik & Edit).
 @Composable
 fun RekapScreen(viewModel: AppViewModel) {
     val absensi = viewModel.absensiList.collectAsState().value
@@ -321,7 +362,6 @@ fun JamaahScreen(viewModel: AppViewModel) {
     var alamat by remember { mutableStateOf("") }
     var jamaahToEdit by remember { mutableStateOf<Jamaah?>(null) }
 
-    // DIALOG EDIT JAMAAH
     if (jamaahToEdit != null) {
         var editId by remember { mutableStateOf(jamaahToEdit!!.idSantri) }
         var editNama by remember { mutableStateOf(jamaahToEdit!!.nama) }
@@ -392,7 +432,7 @@ fun PengaturanScreen(viewModel: AppViewModel) {
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
         Text("Pengaturan", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Versi Aplikasi: 2.0 (Scanner QR Code)")
+        Text("Versi Aplikasi: 2.1 (Continuous Scanner)")
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = { showDialog = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
             Text("Reset Semua Data")
