@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.absensi.jamaah
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -96,7 +97,6 @@ fun AbsensiScreen(viewModel: AppViewModel) {
                             Text("${jamaah.nama} (${jamaah.kelas})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(8.dp))
                             
-                            // Baris 1: Mengikuti & Ijin
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 listOf("Mengikuti", "Ijin").forEach { status ->
                                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -108,7 +108,6 @@ fun AbsensiScreen(viewModel: AppViewModel) {
                                     }
                                 }
                             }
-                            // Baris 2: Tidak Mengikuti & Telat
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 listOf("Tidak Mengikuti", "Telat").forEach { status ->
                                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -141,103 +140,113 @@ fun AbsensiScreen(viewModel: AppViewModel) {
 fun RekapScreen(viewModel: AppViewModel) {
     val absensi = viewModel.absensiList.collectAsState().value
     val jamaah = viewModel.jamaahList.collectAsState().value
-    var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Harian", "Statistik (Total)")
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = selectedTab) {
-            tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(title) }
-                )
-            }
-        }
-
-        if (selectedTab == 0) {
-            RekapHarian(absensi, jamaah)
-        } else {
-            RekapStatistik(absensi, jamaah)
+    
+    // Konversi Tanggal jadi Format Minggu ke-X
+    fun getWeek(dateStr: String): String {
+        return try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val date = sdf.parse(dateStr) ?: return "Lainnya"
+            val cal = java.util.Calendar.getInstance().apply { time = date }
+            "Tahun ${cal.get(java.util.Calendar.YEAR)} - Minggu ke-${cal.get(java.util.Calendar.WEEK_OF_YEAR)}"
+        } catch (e: Exception) {
+            "Lainnya"
         }
     }
-}
 
-@Composable
-fun RekapHarian(absensi: List<Absensi>, jamaah: List<Jamaah>) {
-    var tanggal by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
+    var selectedWeek by remember { mutableStateOf<String?>(null) }
+    var absensiToEdit by remember { mutableStateOf<Absensi?>(null) }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        OutlinedTextField(
-            value = tanggal,
-            onValueChange = { tanggal = it },
-            label = { Text("Filter Tanggal (YYYY-MM-DD)") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+    // TAMPILAN POPUP EDIT
+    if (absensiToEdit != null) {
+        var editStatus by remember { mutableStateOf(absensiToEdit!!.status) }
+        val jamaahName = jamaah.find { it.id == absensiToEdit!!.jamaahId }?.nama ?: "Jamaah"
 
-        val filteredAbsensi = absensi.filter { it.tanggal == tanggal }
-
-        if (filteredAbsensi.isEmpty()) {
-            Text("Belum ada data absensi pada tanggal ini.", modifier = Modifier.padding(top = 16.dp))
-        } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(jamaah) { j ->
-                    val dataJamaah = filteredAbsensi.filter { it.jamaahId == j.id }
-                    
-                    fun getInitial(waktu: String): String {
-                        return when(dataJamaah.find { it.waktuShalat == waktu }?.status) {
-                            "Mengikuti" -> "Hadir"
-                            "Ijin" -> "Ijin"
-                            "Telat" -> "Telat"
-                            "Tidak Mengikuti" -> "Alpa"
-                            else -> "-"
+        AlertDialog(
+            onDismissRequest = { absensiToEdit = null },
+            title = { Text("Edit Absensi") },
+            text = {
+                Column {
+                    Text("Nama: $jamaahName", fontWeight = FontWeight.Bold)
+                    Text("Tanggal: ${absensiToEdit!!.tanggal}")
+                    Text("Waktu: ${absensiToEdit!!.waktuShalat}")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    listOf("Mengikuti", "Ijin", "Tidak Mengikuti", "Telat").forEach { status ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { editStatus = status }) {
+                            RadioButton(selected = editStatus == status, onClick = { editStatus = status })
+                            Text(status)
                         }
                     }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.perbaruiAbsensi(absensiToEdit!!.copy(status = editStatus))
+                    absensiToEdit = null
+                }) { Text("Simpan Perubahan") }
+            },
+            dismissButton = {
+                TextButton(onClick = { absensiToEdit = null }) { Text("Batal") }
+            }
+        )
+    }
 
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(j.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Subuh: ${getInitial("Subuh")} | Dzuhur: ${getInitial("Dzuhur")} | Ashar: ${getInitial("Ashar")}", style = MaterialTheme.typography.bodySmall)
-                            Text("Maghrib: ${getInitial("Maghrib")} | Isya: ${getInitial("Isya")}", style = MaterialTheme.typography.bodySmall)
+    Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+        if (selectedWeek == null) {
+            // TAMPILAN AWAL: DAFTAR MINGGU
+            Text("Rekap Mingguan", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            val grouped = absensi.groupBy { getWeek(it.tanggal) }
+            if (grouped.isEmpty()) {
+                Text("Belum ada data absensi yang dicatat.")
+            } else {
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(grouped.keys.toList().sorted().reversed()) { week ->
+                        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selectedWeek = week }) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(week, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("Total absensi: ${grouped[week]?.size ?: 0} catatan", style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun RekapStatistik(absensi: List<Absensi>, jamaah: List<Jamaah>) {
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        Text("Statistik Kehadiran Jamaah", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (absensi.isEmpty()) {
-            Text("Belum ada data absensi.")
         } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(jamaah) { j ->
-                    val dataJamaah = absensi.filter { it.jamaahId == j.id }
-                    val total = dataJamaah.size
-                    val mengikuti = dataJamaah.count { it.status == "Mengikuti" }
-                    val telat = dataJamaah.count { it.status == "Telat" }
-                    val ijin = dataJamaah.count { it.status == "Ijin" }
-                    val tidakMengikuti = dataJamaah.count { it.status == "Tidak Mengikuti" }
-                    
-                    val persentase = if (total > 0) ((mengikuti + telat).toFloat() / total * 100).toInt() else 0
+            // TAMPILAN DETAIL DALAM SATU MINGGU
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = { selectedWeek = null }) { Text("Kembali") }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(selectedWeek!!, style = MaterialTheme.typography.titleMedium)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
 
+            val weekData = absensi.filter { getWeek(it.tanggal) == selectedWeek }
+            val jamaahInWeek = jamaah.filter { j -> weekData.any { it.jamaahId == j.id } }
+
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(jamaahInWeek) { j ->
+                    val dataJamaah = weekData.filter { it.jamaahId == j.id }.sortedBy { it.tanggal }
                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                Text(j.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                Text("$persentase%", color = if (persentase >= 75) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                            Text(j.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+                            
+                            // Looping data harian santri tersebut
+                            dataJamaah.forEach { ab ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("${ab.tanggal} - ${ab.waktuShalat}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                        Text("Status: ${ab.status}", style = MaterialTheme.typography.bodySmall, color = if(ab.status == "Mengikuti" || ab.status == "Telat") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                                    }
+                                    OutlinedButton(onClick = { absensiToEdit = ab }) {
+                                        Text("Edit")
+                                    }
+                                }
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Hadir: $mengikuti | Telat: $telat | Ijin: $ijin | Alpa: $tidakMengikuti", style = MaterialTheme.typography.bodySmall)
-                            Text("Total Tercatat: $total shalat", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                         }
                     }
                 }
@@ -292,7 +301,7 @@ fun PengaturanScreen(viewModel: AppViewModel) {
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
         Text("Pengaturan", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Versi Aplikasi: 1.0.2 (Update UI & Rekap)")
+        Text("Versi Aplikasi: 1.0.3 (Rekap Mingguan & Edit)")
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = { showDialog = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
             Text("Reset Semua Data")
