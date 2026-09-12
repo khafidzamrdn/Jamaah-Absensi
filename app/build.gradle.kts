@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
-    id("com.google.gms.google-services") // PLUGIN FIREBASE
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -50,10 +50,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.navigation:navigation-compose:2.7.2")
 
-    // Firebase BoM & Firestore Database (Menggantikan Room Lokal)
+    // Firebase BoM & Firestore
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-firestore")
 
-    // Library QR Code Scanner (ZXing)
+    // QR Scanner
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 }
