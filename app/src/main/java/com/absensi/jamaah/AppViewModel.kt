@@ -9,6 +9,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// ===== MODEL DATA =====
+data class Jamaah(
+    val id: String = "",
+    val idSantri: String = "",
+    val nama: String = "",
+    val kelas: String = "",
+    val alamat: String = "",
+    val kategori: String = "Putra" // <-- FIELD BARU PEMISAH KATEGORI
+)
+
+data class Absensi(
+    val id: String = "",
+    val jamaahId: String = "",
+    val tanggal: String = "",
+    val waktuShalat: String = "",
+    val status: String = "",
+    val timestamp: Long = 0L
+)
+
+// ===== VIEW MODEL =====
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FirebaseFirestore.getInstance()
 
@@ -32,7 +52,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             idSantri = doc.getString("idSantri") ?: "",
                             nama = doc.getString("nama") ?: "",
                             kelas = doc.getString("kelas") ?: "",
-                            alamat = doc.getString("alamat") ?: ""
+                            alamat = doc.getString("alamat") ?: "",
+                            kategori = doc.getString("kategori") ?: "Putra"
                         )
                     }.sortedBy { it.nama }
                 }
@@ -57,10 +78,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun tambahJamaah(idSantri: String, nama: String, kelas: String, alamat: String) {
+    fun tambahJamaah(idSantri: String, nama: String, kelas: String, alamat: String, kategori: String) {
         viewModelScope.launch {
             try {
-                val data = mapOf("idSantri" to idSantri, "nama" to nama, "kelas" to kelas, "alamat" to alamat)
+                val data = mapOf("idSantri" to idSantri, "nama" to nama, "kelas" to kelas, "alamat" to alamat, "kategori" to kategori)
                 db.collection("jamaah").add(data).await()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -71,7 +92,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun perbaruiJamaah(jamaah: Jamaah) {
         viewModelScope.launch {
             try {
-                val data = mapOf("idSantri" to jamaah.idSantri, "nama" to jamaah.nama, "kelas" to jamaah.kelas, "alamat" to jamaah.alamat)
+                val data = mapOf("idSantri" to jamaah.idSantri, "nama" to jamaah.nama, "kelas" to jamaah.kelas, "alamat" to jamaah.alamat, "kategori" to jamaah.kategori)
                 db.collection("jamaah").document(jamaah.id).set(data).await()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -208,14 +229,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 for (doc in absensiDocs) { doc.reference.delete().await() }
 
                 val dummies = listOf(
-                    Jamaah(idSantri = "QR001", nama = "Ahmad", kelas = "A", alamat = "Pondok 1"),
-                    Jamaah(idSantri = "QR002", nama = "Muhammad Rizky", kelas = "A", alamat = "Pondok 2"),
-                    Jamaah(idSantri = "QR003", nama = "Fajar", kelas = "B", alamat = "Pondok 1"),
-                    Jamaah(idSantri = "QR004", nama = "Ilham", kelas = "C", alamat = "Pondok 3"),
-                    Jamaah(idSantri = "QR005", nama = "Bagas", kelas = "B", alamat = "Pondok 2")
+                    Jamaah(idSantri = "QR001", nama = "Ahmad", kelas = "A", alamat = "Pondok 1", kategori = "Putra"),
+                    Jamaah(idSantri = "QR002", nama = "M. Rizky", kelas = "A", alamat = "Pondok 2", kategori = "Putra"),
+                    Jamaah(idSantri = "QR003", nama = "Siti Aisyah", kelas = "B", alamat = "Pondok Putri", kategori = "Putri"),
+                    Jamaah(idSantri = "QR004", nama = "Fatimah", kelas = "C", alamat = "Pondok Putri", kategori = "Putri")
                 )
                 dummies.forEach { 
-                    db.collection("jamaah").add(mapOf("idSantri" to it.idSantri, "nama" to it.nama, "kelas" to it.kelas, "alamat" to it.alamat)).await()
+                    db.collection("jamaah").add(
+                        mapOf("idSantri" to it.idSantri, "nama" to it.nama, "kelas" to it.kelas, "alamat" to it.alamat, "kategori" to it.kategori)
+                    ).await()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
