@@ -2,6 +2,11 @@
 
 Aplikasi pencatatan absensi jamaah shalat 5 waktu. Dibuat khusus untuk pengujian offline tanpa database online.
 
+## Download APK
+Siapa pun bisa langsung mengunduh APK terbaru tanpa perlu login:
+
+[Download APK Terbaru](https://github.com/khafidzamrdn/Jamaah-Absensi/releases/latest/download/app-release.apk)
+
 ## Fitur
 - Manajemen Data Jamaah (Tambah, Hapus, Lihat).
 - Pencatatan Absensi 5 Waktu Shalat (Mengikuti, Ijin, Tidak Mengikuti, Telat).
