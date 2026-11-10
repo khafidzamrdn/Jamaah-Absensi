@@ -12,14 +12,27 @@ android {
         applicationId = "com.absensi.jamaah"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "2.0.0"
+        versionCode = (System.getenv("VERSION_CODE") ?: "2").toInt()
+        versionName = System.getenv("VERSION_NAME") ?: "2.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("keystore/release.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "jamaahabsensi"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "jamaah"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "jamaahabsensi"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
