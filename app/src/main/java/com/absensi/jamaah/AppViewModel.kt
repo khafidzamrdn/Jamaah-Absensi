@@ -110,25 +110,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    suspend fun cekAbsensiAda(tanggal: String, waktu: String): Boolean {
+    suspend fun ambilAbsensiSesi(tanggal: String, waktu: String): Map<String, String> {
         return try {
             val query = db.collection("absensi")
                 .whereEqualTo("tanggal", tanggal)
                 .whereEqualTo("waktuShalat", waktu)
                 .get()
                 .await()
-            !query.isEmpty
+            query.documents.associate { doc ->
+                (doc.getString("jamaahId") ?: "") to (doc.getString("status") ?: "Mengikuti")
+            }
         } catch (e: Exception) {
-            false
+            emptyMap()
         }
     }
 
     fun simpanAbsensi(absensiListInput: List<Absensi>) {
+        if (absensiListInput.isEmpty()) return
         viewModelScope.launch {
             try {
+                val tanggal = absensiListInput.first().tanggal
+                val waktu = absensiListInput.first().waktuShalat
+                val existing = db.collection("absensi")
+                    .whereEqualTo("tanggal", tanggal)
+                    .whereEqualTo("waktuShalat", waktu)
+                    .get()
+                    .await()
+                val existingByJamaah = existing.documents.associateBy { it.getString("jamaahId") ?: "" }
+
                 val batch = db.batch()
                 absensiListInput.forEach { absen ->
-                    val ref = db.collection("absensi").document()
                     val data = mapOf(
                         "jamaahId" to absen.jamaahId,
                         "tanggal" to absen.tanggal,
@@ -136,7 +147,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         "status" to absen.status,
                         "timestamp" to absen.timestamp
                     )
-                    batch.set(ref, data)
+                    val existingDoc = existingByJamaah[absen.jamaahId]
+                    if (existingDoc == null) {
+                        batch.set(db.collection("absensi").document(), data)
+                    } else {
+                        batch.update(existingDoc.reference, mapOf("status" to absen.status, "timestamp" to absen.timestamp))
+                    }
                 }
                 batch.commit().await()
             } catch (e: Exception) {

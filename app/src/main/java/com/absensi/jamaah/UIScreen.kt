@@ -210,19 +210,13 @@ fun AbsensiManualView(viewModel: AppViewModel) {
     
     var tabKategori by remember { mutableStateOf("Putra") }
     val absensiState = remember { mutableStateMapOf<String, String>() }
-    var errorMessage by remember { mutableStateOf("") }
     var successMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(jamaahList, waktu, tanggal) {
-        val sudahAda = viewModel.cekAbsensiAda(tanggal, waktu)
-        if (sudahAda) {
-            errorMessage = "Absensi untuk sesi ini sudah dilakukan."
-        } else {
-            errorMessage = ""
-            jamaahList.forEach { absensiState[it.id] = "Mengikuti" }
-        }
         successMessage = ""
+        val statusAda = viewModel.ambilAbsensiSesi(tanggal, waktu)
+        jamaahList.forEach { absensiState[it.id] = statusAda[it.id] ?: "Mengikuti" }
     }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
@@ -244,12 +238,12 @@ fun AbsensiManualView(viewModel: AppViewModel) {
         }
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (errorMessage.isNotEmpty()) {
-            Text(errorMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-        } else if (successMessage.isNotEmpty()) {
+        if (successMessage.isNotEmpty()) {
             Text(successMessage, color = LokalTema.current.utama, fontWeight = FontWeight.Bold)
-        } else {
-            val filteredJamaah = jamaahList.filter { it.kategori == tabKategori }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        val filteredJamaah = jamaahList.filter { it.kategori == tabKategori }
             
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(filteredJamaah) { jamaah ->
@@ -299,7 +293,6 @@ fun AbsensiManualView(viewModel: AppViewModel) {
             ) {
                 Text("Simpan Semua Absensi", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
-        }
     }
 }
 
