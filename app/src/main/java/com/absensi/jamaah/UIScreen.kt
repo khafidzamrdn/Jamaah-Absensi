@@ -7,21 +7,63 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,19 +79,80 @@ import androidx.core.content.ContextCompat
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
+import com.komoui.components.AlertDialog
+import com.komoui.components.AlertDialogAction
+import com.komoui.components.AlertDialogCancel
+import com.komoui.components.AlertDialogDescription
+import com.komoui.components.AlertDialogTitle
+import com.komoui.components.Avatar
+import com.komoui.components.Badge
+import com.komoui.components.BadgeVariant
+import com.komoui.components.Button
+import com.komoui.components.ButtonSize
+import com.komoui.components.ButtonVariant
+import com.komoui.components.Card
+import com.komoui.components.CardContent
+import com.komoui.components.CardDescription
+import com.komoui.components.CardFooter
+import com.komoui.components.CardHeader
+import com.komoui.components.CardTitle
+import com.komoui.components.Dialog
+import com.komoui.components.DialogDescription
+import com.komoui.components.DialogTitle
+import com.komoui.components.Empty
+import com.komoui.components.EmptyDescription
+import com.komoui.components.EmptyHeader
+import com.komoui.components.EmptyTitle
+import com.komoui.components.Input
+import com.komoui.components.LayoutOrientation
+import com.komoui.components.Progress
+import com.komoui.components.RadioButtonWithLabel
+import com.komoui.components.RadioGroup
+import com.komoui.components.Select
+import com.komoui.components.Switch
+import com.komoui.components.TabsList
+import com.komoui.components.charts.BarChart
+import com.komoui.components.charts.BarPoint
+import com.komoui.components.charts.BarSeries
+import com.komoui.components.charts.ChartAxisOptions
+import com.komoui.components.charts.LineChart
+import com.komoui.components.charts.LinePoint
+import com.komoui.components.charts.LineSeries
+import com.komoui.themes.komoTypography
+import com.komoui.themes.styles
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+private val screens = listOf("Dashboard", "Absensi", "Rekap", "Jamaah", "Pengaturan")
+
+private fun inisial(nama: String): String =
+    nama.trim()
+        .split(" ")
+        .filter { it.isNotBlank() }
+        .take(2)
+        .joinToString("") { it.first().uppercase() }
+        .ifBlank { "?" }
+
+private fun formatTanggalSingkat(tanggal: String): String =
+    if (tanggal.length >= 10) tanggal.substring(5).replace("-", "/") else tanggal
 
 @Composable
 fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: () -> Unit) {
     var currentScreen by remember { mutableStateOf("Dashboard") }
-    val screens = listOf("Dashboard", "Absensi", "Rekap", "Jamaah", "Pengaturan")
-    val icons = listOf(Icons.Filled.Home, Icons.Filled.Edit, Icons.Filled.DateRange, Icons.Filled.Person, Icons.Filled.Settings)
+    val icons = listOf(
+        Icons.Filled.Home,
+        Icons.Filled.Edit,
+        Icons.Filled.DateRange,
+        Icons.Filled.Person,
+        Icons.Filled.Settings
+    )
 
     Scaffold(
+        containerColor = MaterialTheme.styles.background,
         topBar = {
             TopAppBar(
                 title = { Text("Absensi Jamaah", fontWeight = FontWeight.Bold) },
@@ -58,19 +161,19 @@ fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: (
                         Icon(
                             painter = painterResource(id = if (isDarkMode) R.drawable.ic_sun else R.drawable.ic_moon),
                             contentDescription = if (isDarkMode) "Ubah ke mode terang" else "Ubah ke mode gelap",
-                            tint = Color.White
+                            tint = MaterialTheme.styles.foreground
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = WarnaUtama,
-                    titleContentColor = Color.White,
-                    actionIconContentColor = Color.White
+                    containerColor = MaterialTheme.styles.card,
+                    titleContentColor = MaterialTheme.styles.foreground,
+                    actionIconContentColor = MaterialTheme.styles.foreground
                 )
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = LokalTema.current.permukaan, tonalElevation = 8.dp) {
+            NavigationBar(containerColor = MaterialTheme.styles.card, tonalElevation = 0.dp) {
                 screens.forEachIndexed { index, title ->
                     NavigationBarItem(
                         icon = { Icon(icons[index], contentDescription = title) },
@@ -78,108 +181,168 @@ fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: (
                         selected = currentScreen == title,
                         onClick = { currentScreen = title },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color.White,
-                            selectedTextColor = LokalTema.current.utama,
-                            indicatorColor = LokalTema.current.utama,
-                            unselectedIconColor = LokalTema.current.teksSekunder
+                            selectedIconColor = MaterialTheme.styles.primaryForeground,
+                            selectedTextColor = MaterialTheme.styles.primary,
+                            indicatorColor = MaterialTheme.styles.primary,
+                            unselectedIconColor = MaterialTheme.styles.mutedForeground,
+                            unselectedTextColor = MaterialTheme.styles.mutedForeground
                         )
                     )
                 }
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues).fillMaxSize().background(LokalTema.current.latar)) {
+        Box(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+                .background(MaterialTheme.styles.background)
+        ) {
             when (currentScreen) {
                 "Dashboard" -> DashboardScreen(viewModel) { currentScreen = "Absensi" }
                 "Absensi" -> AbsensiScreen(viewModel)
                 "Rekap" -> RekapScreen(viewModel)
                 "Jamaah" -> JamaahScreen(viewModel)
-                "Pengaturan" -> PengaturanScreen(viewModel)
+                "Pengaturan" -> PengaturanScreen(viewModel, isDarkMode, onToggleTheme)
             }
         }
     }
 }
 
 @Composable
-fun DashboardCard(title: String, count: Int, bgColor: Color, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.height(110.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(count.toString(), color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
-            Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+private fun DashboardStat(title: String, count: Int, color: Color, modifier: Modifier = Modifier) {
+    Card(modifier = modifier) {
+        CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+                Column {
+                    Text(
+                        count.toString(),
+                        style = MaterialTheme.komoTypography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        title,
+                        style = MaterialTheme.komoTypography.label,
+                        color = MaterialTheme.styles.mutedForeground
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 fun DashboardScreen(viewModel: AppViewModel, onMulaiAbsensi: () -> Unit) {
-    val jamaah = viewModel.jamaahList.collectAsState().value
-    val absensi = viewModel.absensiList.collectAsState().value
-    val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-    
-    val todayAbsensi = absensi.filter { it.tanggal == today }
+    val jamaah by viewModel.jamaahList.collectAsState()
+    val absensi by viewModel.absensiList.collectAsState()
+    val today = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
+
+    val todayAbsensi = remember(absensi, today) { absensi.filter { it.tanggal == today } }
     val mengikuti = todayAbsensi.count { it.status == "Mengikuti" }
     val ijin = todayAbsensi.count { it.status == "Ijin" }
     val tidakMengikuti = todayAbsensi.count { it.status == "Tidak Mengikuti" }
     val telat = todayAbsensi.count { it.status == "Telat" }
-
     val totalPutra = jamaah.count { it.kategori == "Putra" }
     val totalPutri = jamaah.count { it.kategori == "Putri" }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painter = painterResource(id = R.drawable.logo),
-                contentDescription = "Logo Aplikasi",
-                modifier = Modifier.size(65.dp).clip(RoundedCornerShape(12.dp))
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text("Assalamualaikum,", fontSize = 16.sp, color = LokalTema.current.teksSekunder)
-                Text("Ringkasan Hari Ini", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "Logo Aplikasi",
+                    modifier = Modifier.size(65.dp).clip(RoundedCornerShape(12.dp))
+                )
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text(
+                        "Assalamualaikum,",
+                        style = MaterialTheme.komoTypography.body,
+                        color = MaterialTheme.styles.mutedForeground
+                    )
+                    Text(
+                        "Ringkasan Hari Ini",
+                        style = MaterialTheme.komoTypography.titleLarge,
+                        color = MaterialTheme.styles.foreground
+                    )
+                }
             }
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(today, fontSize = 14.sp, color = WarnaAksen, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DashboardCard("Hadir", mengikuti, Color(0xFF2E7D32), Modifier.weight(1f))
-            DashboardCard("Ijin", ijin, Color(0xFF1565C0), Modifier.weight(1f))
+        item {
+            Badge(variant = BadgeVariant.Secondary) { Text(today) }
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DashboardCard("Telat", telat, Color(0xFFF57F17), Modifier.weight(1f))
-            DashboardCard("Alpha", tidakMengikuti, Color(0xFFC62828), Modifier.weight(1f))
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                DashboardStat("Hadir", mengikuti, MaterialTheme.styles.chart1, Modifier.weight(1f))
+                DashboardStat("Ijin", ijin, MaterialTheme.styles.chart2, Modifier.weight(1f))
+            }
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = WarnaUtama),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Total Jamaah Terdaftar", color = WarnaAksen, fontSize = 14.sp)
-                Text("${jamaah.size} Orang", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                Text("( Putra: $totalPutra | Putri: $totalPutri )", color = Color.White, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = onMulaiAbsensi, 
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = WarnaAksen)
-                ) {
-                    Text("MULAI ABSENSI SEKARANG", color = WarnaUtama, fontWeight = FontWeight.Bold)
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                DashboardStat("Telat", telat, MaterialTheme.styles.chart3, Modifier.weight(1f))
+                DashboardStat("Alpha", tidakMengikuti, MaterialTheme.styles.chart4, Modifier.weight(1f))
+            }
+        }
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                CardHeader {
+                    CardTitle { Text("Total Jamaah Terdaftar") }
+                    CardDescription { Text("Putra: $totalPutra  |  Putri: $totalPutri") }
+                }
+                CardContent {
+                    Text(
+                        "${jamaah.size} Orang",
+                        style = MaterialTheme.komoTypography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.styles.primary
+                    )
+                }
+                CardFooter {
+                    Button(onClick = onMulaiAbsensi, fullWidth = true, size = ButtonSize.Lg) {
+                        Text("Mulai Absensi Sekarang")
+                    }
+                }
+            }
+        }
+        if (todayAbsensi.isNotEmpty()) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    CardHeader {
+                        CardTitle { Text("Status Hari Ini") }
+                        CardDescription { Text("Rekap seluruh sesi absensi hari ini") }
+                    }
+                    CardContent {
+                        BarChart(
+                            series = listOf(
+                                BarSeries(
+                                    key = "hari-ini",
+                                    label = "Jamaah",
+                                    color = MaterialTheme.styles.primary,
+                                    points = listOf(
+                                        BarPoint("Hadir", mengikuti.toFloat()),
+                                        BarPoint("Ijin", ijin.toFloat()),
+                                        BarPoint("Telat", telat.toFloat()),
+                                        BarPoint("Alpha", tidakMengikuti.toFloat())
+                                    )
+                                )
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            chartHeight = 180.dp,
+                            showValueLabels = true,
+                            axisOptions = ChartAxisOptions(
+                                yTickCount = 3,
+                                yLabelFormatter = { it.toInt().toString() }
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -189,25 +352,29 @@ fun DashboardScreen(viewModel: AppViewModel, onMulaiAbsensi: () -> Unit) {
 @Composable
 fun AbsensiScreen(viewModel: AppViewModel) {
     var modeAbsensi by remember { mutableStateOf(0) }
-    val tabs = listOf("Manual", "Scan Kamera")
-
     Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = modeAbsensi, containerColor = LokalTema.current.permukaan, contentColor = LokalTema.current.utama) {
-            tabs.forEachIndexed { index, title ->
-                Tab(selected = modeAbsensi == index, onClick = { modeAbsensi = index }, text = { Text(title, fontWeight = FontWeight.Bold) })
-            }
+        TabsList(
+            selectedTabIndex = modeAbsensi,
+            onTabSelected = { modeAbsensi = it },
+            tabs = listOf("Manual", "Scan Kamera"),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        if (modeAbsensi == 0) {
+            AbsensiManualView(viewModel, Modifier.weight(1f))
+        } else {
+            AbsensiScanView(viewModel, Modifier.weight(1f))
         }
-        if (modeAbsensi == 0) AbsensiManualView(viewModel) else AbsensiScanView(viewModel)
     }
 }
 
 @Composable
-fun AbsensiManualView(viewModel: AppViewModel) {
-    val jamaahList = viewModel.jamaahList.collectAsState().value
-    var tanggal by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
+fun AbsensiManualView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
+    val jamaahList by viewModel.jamaahList.collectAsState()
+    var tanggal by remember {
+        mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()))
+    }
     var waktu by remember { mutableStateOf("Subuh") }
     val waktuList = listOf("Subuh", "Dzuhur", "Ashar", "Maghrib", "Isya")
-    
     var tabKategori by remember { mutableStateOf("Putra") }
     val absensiState = remember { mutableStateMapOf<String, String>() }
     var successMessage by remember { mutableStateOf("") }
@@ -219,186 +386,259 @@ fun AbsensiManualView(viewModel: AppViewModel) {
         jamaahList.forEach { absensiState[it.id] = statusAda[it.id] ?: "Mengikuti" }
     }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        OutlinedTextField(value = tanggal, onValueChange = { tanggal = it }, label = { Text("Tanggal") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            waktuList.forEach { w -> 
-                FilterChip(
-                    selected = waktu == w, 
-                    onClick = { waktu = w }, 
-                    label = { Text(w, fontSize = 11.sp) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = WarnaAksen, selectedLabelColor = WarnaUtama)
-                ) 
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
+                    Input(
+                        value = tanggal,
+                        onValueChange = { tanggal = it },
+                        placeholder = "Tanggal (yyyy-MM-dd)",
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Select(
+                        options = waktuList,
+                        selectedOption = waktu,
+                        onOptionSelected = { waktu = it },
+                        label = { it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "Pilih waktu shalat"
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    TabsList(
+                        selectedTabIndex = if (tabKategori == "Putra") 0 else 1,
+                        onTabSelected = { tabKategori = if (it == 0) "Putra" else "Putri" },
+                        tabs = listOf("Putra", "Putri"),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (successMessage.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            successMessage,
+                            color = MaterialTheme.styles.primary,
+                            style = MaterialTheme.komoTypography.bodyMedium
+                        )
+                    }
+                }
             }
         }
 
-        TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = LokalTema.current.permukaan, contentColor = LokalTema.current.utama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
-            Tab(selected = tabKategori == "Putra", onClick = { tabKategori = "Putra" }, text = { Text("👦 Putra") })
-            Tab(selected = tabKategori == "Putri", onClick = { tabKategori = "Putri" }, text = { Text("🧕 Putri") })
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (successMessage.isNotEmpty()) {
-            Text(successMessage, color = LokalTema.current.utama, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        val filteredJamaah = jamaahList.filter { it.kategori == tabKategori }
-            
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(filteredJamaah) { jamaah ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("${jamaah.nama} (${jamaah.kelas})", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-                            Divider(modifier = Modifier.padding(vertical = 8.dp))
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                listOf("Mengikuti", "Ijin").forEach { status ->
-                                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                        RadioButton(selected = absensiState[jamaah.id] == status, onClick = { absensiState[jamaah.id] = status })
-                                        Text(status, fontSize = 14.sp)
-                                    }
-                                }
+        val filtered = jamaahList.filter { it.kategori == tabKategori }
+        if (filtered.isEmpty()) {
+            item {
+                Empty {
+                    EmptyHeader {
+                        EmptyTitle { Text("Belum ada jamaah") }
+                        EmptyDescription { Text("Tambahkan data jamaah terlebih dahulu.") }
+                    }
+                }
+            }
+        } else {
+            items(filtered, key = { it.id }) { jamaah ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Avatar(model = null, fallbackText = inisial(jamaah.nama), size = 40.dp)
+                            Column {
+                                Text(
+                                    jamaah.nama,
+                                    style = MaterialTheme.komoTypography.title,
+                                    color = MaterialTheme.styles.foreground
+                                )
+                                Text(
+                                    "${jamaah.kelas} • ${jamaah.alamat}",
+                                    style = MaterialTheme.komoTypography.label,
+                                    color = MaterialTheme.styles.mutedForeground
+                                )
                             }
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                listOf("Tidak Mengikuti", "Telat").forEach { status ->
-                                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                        RadioButton(selected = absensiState[jamaah.id] == status, onClick = { absensiState[jamaah.id] = status })
-                                        Text(status, fontSize = 14.sp)
-                                    }
-                                }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                        RadioGroup(
+                            selectedValue = absensiState[jamaah.id] ?: "Mengikuti",
+                            onValueChange = { absensiState[jamaah.id] = it },
+                            orientation = LayoutOrientation.Vertical
+                        ) {
+                            listOf("Mengikuti", "Ijin", "Tidak Mengikuti", "Telat").forEach { status ->
+                                RadioButtonWithLabel(value = status, label = status)
                             }
                         }
                     }
                 }
             }
+        }
+
+        item {
             Button(
                 onClick = {
                     coroutineScope.launch {
-                        // Simpan akan mengeksekusi semua data (Putra & Putri sekaligus)
                         val dataToSave = jamaahList.map {
-                            Absensi(jamaahId = it.id, tanggal = tanggal, waktuShalat = waktu, status = absensiState[it.id] ?: "Mengikuti")
+                            Absensi(
+                                jamaahId = it.id,
+                                tanggal = tanggal,
+                                waktuShalat = waktu,
+                                status = absensiState[it.id] ?: "Mengikuti"
+                            )
                         }
                         viewModel.simpanAbsensi(dataToSave)
-                        successMessage = "✅ Data Absensi (Putra & Putri) Berhasil Disimpan!"
+                        successMessage = "Data absensi Putra & Putri berhasil disimpan."
                     }
-                }, 
-                modifier = Modifier.fillMaxWidth().height(55.dp).padding(top = 8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = WarnaUtama),
-                shape = RoundedCornerShape(12.dp)
+                },
+                fullWidth = true,
+                size = ButtonSize.Lg
             ) {
-                Text("Simpan Semua Absensi", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Simpan Semua Absensi")
             }
+        }
     }
 }
 
 @Composable
-fun AbsensiScanView(viewModel: AppViewModel) {
+fun AbsensiScanView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
     val coroutineScope = rememberCoroutineScope()
-    var tanggal by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
+    var tanggal by remember {
+        mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()))
+    }
     var waktu by remember { mutableStateOf("Subuh") }
     val waktuList = listOf("Subuh", "Dzuhur", "Ashar", "Maghrib", "Isya")
-    
     var isSessionReady by remember { mutableStateOf(false) }
     var scanResultMsg by remember { mutableStateOf("") }
     var showPopup by remember { mutableStateOf(false) }
     var lastScanTime by remember { mutableStateOf(0L) }
 
     val context = LocalContext.current
-    var hasCameraPermission by remember { 
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) 
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        )
     }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { 
-        hasCameraPermission = it 
-    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { hasCameraPermission = it }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            OutlinedTextField(value = tanggal, onValueChange = { tanggal = it }, label = { Text("Tanggal") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                waktuList.forEach { w -> 
-                    FilterChip(
-                        selected = waktu == w, 
-                        onClick = { waktu = w; isSessionReady = false }, 
-                        label = { Text(w, fontSize = 11.sp) },
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = WarnaAksen, selectedLabelColor = WarnaUtama)
-                    ) 
-                }
-            }
-            
-            if (!isSessionReady) {
-                Button(
-                    onClick = {
-                        coroutineScope.launch {
-                            viewModel.siapkanAbsensiScan(tanggal, waktu)
-                            isSessionReady = true
-                        }
-                    }, 
-                    modifier = Modifier.fillMaxWidth().height(55.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = WarnaUtama)
-                ) {
-                    Text("Siapkan Sesi Scan Kamera", fontSize = 16.sp)
-                }
-            } else {
-                if (!hasCameraPermission) {
-                    Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                        Text("Izinkan Akses Kamera")
-                    }
-                } else {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                    ) {
-                        AndroidView(
-                            factory = { ctx ->
-                                DecoratedBarcodeView(ctx).apply {
-                                    setStatusText("")
-                                    resume()
-                                }
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
+                        Input(
+                            value = tanggal,
+                            onValueChange = { tanggal = it },
+                            placeholder = "Tanggal (yyyy-MM-dd)",
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Select(
+                            options = waktuList,
+                            selectedOption = waktu,
+                            onOptionSelected = {
+                                waktu = it
+                                isSessionReady = false
                             },
-                            update = { view ->
-                                view.decodeContinuous(object : BarcodeCallback {
-                                    override fun barcodeResult(result: BarcodeResult?) {
-                                        result?.text?.let { scannedId ->
-                                            val currentTime = System.currentTimeMillis()
-                                            if (currentTime - lastScanTime > 2500) {
-                                                lastScanTime = currentTime
-                                                coroutineScope.launch {
-                                                    val pesan = viewModel.prosesScanQr(scannedId, tanggal, waktu)
-                                                    scanResultMsg = pesan
-                                                    showPopup = true
-
-                                                    try {
-                                                        val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-                                                        if (pesan.contains("✅")) toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
-                                                        else if (pesan.contains("⚠️")) toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
-                                                        else toneGen.startTone(ToneGenerator.TONE_CDMA_ABBR_ALERT, 200)
-                                                    } catch (e: Exception) { e.printStackTrace() }
-
-                                                    delay(2000)
-                                                    showPopup = false
-                                                }
-                                            }
-                                        }
-                                    }
-                                    override fun possibleResultPoints(resultPoints: MutableList<com.google.zxing.ResultPoint>?) {}
-                                })
-                            },
-                            onRelease = { view -> view.pause() }
+                            label = { it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = "Pilih waktu shalat"
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+
+            if (!isSessionReady) {
+                item {
                     Button(
-                        onClick = { isSessionReady = false }, 
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        onClick = {
+                            coroutineScope.launch {
+                                viewModel.siapkanAbsensiScan(tanggal, waktu)
+                                isSessionReady = true
+                            }
+                        },
+                        fullWidth = true,
+                        size = ButtonSize.Lg
+                    ) {
+                        Text("Siapkan Sesi Scan Kamera")
+                    }
+                }
+            } else if (!hasCameraPermission) {
+                item {
+                    Button(
+                        onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                        fullWidth = true
+                    ) {
+                        Text("Izinkan Akses Kamera")
+                    }
+                }
+            } else {
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Box(modifier = Modifier.fillMaxWidth().height(380.dp)) {
+                            AndroidView(
+                                modifier = Modifier.fillMaxSize(),
+                                factory = { ctx ->
+                                    DecoratedBarcodeView(ctx).apply {
+                                        setStatusText("")
+                                        resume()
+                                        decodeContinuous(object : BarcodeCallback {
+                                            override fun barcodeResult(result: BarcodeResult?) {
+                                                result?.text?.let { scannedId ->
+                                                    val currentTime = System.currentTimeMillis()
+                                                    if (currentTime - lastScanTime > 2500) {
+                                                        lastScanTime = currentTime
+                                                        coroutineScope.launch {
+                                                            val pesan = viewModel.prosesScanQr(scannedId, tanggal, waktu)
+                                                            scanResultMsg = pesan
+                                                            showPopup = true
+                                                            try {
+                                                                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                                                                if (pesan.contains("✅")) {
+                                                                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+                                                                } else if (pesan.contains("⚠️")) {
+                                                                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
+                                                                } else {
+                                                                    toneGen.startTone(ToneGenerator.TONE_CDMA_ABBR_ALERT, 200)
+                                                                }
+                                                            } catch (e: Exception) {
+                                                                e.printStackTrace()
+                                                            }
+                                                            delay(2000)
+                                                            showPopup = false
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            override fun possibleResultPoints(
+                                                resultPoints: MutableList<com.google.zxing.ResultPoint>?
+                                            ) {
+                                            }
+                                        })
+                                    }
+                                },
+                                onRelease = { view -> view.pause() }
+                            )
+                        }
+                    }
+                }
+                item {
+                    Button(
+                        onClick = { isSessionReady = false },
+                        fullWidth = true,
+                        variant = ButtonVariant.Destructive
                     ) {
                         Text("Hentikan Kamera")
                     }
@@ -408,27 +648,51 @@ fun AbsensiScanView(viewModel: AppViewModel) {
 
         AnimatedVisibility(
             visible = showPopup,
-            enter = fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.8f, animationSpec = tween(300)),
-            exit = fadeOut(animationSpec = tween(300)) + scaleOut(targetScale = 0.8f, animationSpec = tween(300)),
+            enter = fadeIn(animationSpec = tween(300)) +
+                scaleIn(initialScale = 0.8f, animationSpec = tween(300)),
+            exit = fadeOut(animationSpec = tween(300)) +
+                scaleOut(targetScale = 0.8f, animationSpec = tween(300)),
             modifier = Modifier.align(Alignment.Center)
         ) {
-            Card(
-                modifier = Modifier.padding(32.dp).fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (scanResultMsg.contains("✅")) Color(0xFFE8F5E9) else if (scanResultMsg.contains("⚠️")) Color(0xFFFFFDE7) else Color(0xFFFFEBEE)
-                )
-            ) {
-                Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier.size(64.dp).clip(CircleShape).background(if (scanResultMsg.contains("✅")) Color(0xFF2E7D32) else if (scanResultMsg.contains("⚠️")) Color(0xFFF57F17) else Color(0xFFC62828)),
-                        contentAlignment = Alignment.Center
+            Card(modifier = Modifier.padding(32.dp).fillMaxWidth()) {
+                CardContent(modifier = Modifier.padding(vertical = 24.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(imageVector = if (scanResultMsg.contains("✅")) Icons.Filled.Check else if (scanResultMsg.contains("⚠️")) Icons.Filled.Warning else Icons.Filled.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
+                        val sukses = scanResultMsg.contains("✅")
+                        val peringatan = scanResultMsg.contains("⚠️")
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when {
+                                        sukses -> MaterialTheme.styles.chart1
+                                        peringatan -> MaterialTheme.styles.chart3
+                                        else -> MaterialTheme.styles.destructive
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = when {
+                                    sukses -> Icons.Filled.Check
+                                    peringatan -> Icons.Filled.Warning
+                                    else -> Icons.Filled.Close
+                                },
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            scanResultMsg,
+                            style = MaterialTheme.komoTypography.titleLarge,
+                            textAlign = TextAlign.Center
+                        )
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = scanResultMsg, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, color = if (scanResultMsg.contains("✅")) Color(0xFF1B5E20) else if (scanResultMsg.contains("⚠️")) Color(0xFFF57F17) else Color(0xFFB71C1C))
                 }
             }
         }
@@ -437,67 +701,127 @@ fun AbsensiScanView(viewModel: AppViewModel) {
 
 @Composable
 fun RekapScreen(viewModel: AppViewModel) {
-    val absensi = viewModel.absensiList.collectAsState().value
-    val jamaah = viewModel.jamaahList.collectAsState().value
-    
+    val absensi by viewModel.absensiList.collectAsState()
+    val jamaah by viewModel.jamaahList.collectAsState()
+
     fun getWeek(dateStr: String): String {
         return try {
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val date = sdf.parse(dateStr) ?: return "Lainnya"
-            val cal = java.util.Calendar.getInstance().apply { time = date }
-            "Minggu ke-${cal.get(java.util.Calendar.WEEK_OF_YEAR)} (${cal.get(java.util.Calendar.YEAR)})"
-        } catch (e: Exception) { "Lainnya" }
+            val cal = Calendar.getInstance().apply { time = date }
+            "Minggu ke-${cal.get(Calendar.WEEK_OF_YEAR)} (${cal.get(Calendar.YEAR)})"
+        } catch (e: Exception) {
+            "Lainnya"
+        }
     }
 
+    var tabKategori by remember { mutableStateOf("Putra") }
     var selectedWeek by remember { mutableStateOf<String?>(null) }
     var absensiToEdit by remember { mutableStateOf<Absensi?>(null) }
 
-    if (absensiToEdit != null) {
-        var editStatus by remember { mutableStateOf(absensiToEdit!!.status) }
-        val jamaahName = jamaah.find { it.id == absensiToEdit!!.jamaahId }?.nama ?: "Jamaah"
+    absensiToEdit?.let { current ->
+        var editStatus by remember(current.id) { mutableStateOf(current.status) }
+        val jamaahName = jamaah.find { it.id == current.jamaahId }?.nama ?: "Jamaah"
 
         AlertDialog(
+            open = true,
             onDismissRequest = { absensiToEdit = null },
-            title = { Text("Edit Absensi", color = LokalTema.current.utama, fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
+            title = { AlertDialogTitle { Text("Edit Absensi") } },
+            description = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Nama: $jamaahName", fontWeight = FontWeight.Bold)
-                    Text("Waktu: ${absensiToEdit!!.tanggal} | ${absensiToEdit!!.waktuShalat}")
-                    Spacer(modifier = Modifier.height(12.dp))
-                    listOf("Mengikuti", "Ijin", "Tidak Mengikuti", "Telat").forEach { status ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { editStatus = status }) {
-                            RadioButton(selected = editStatus == status, onClick = { editStatus = status })
-                            Text(status)
+                    Text(
+                        "${current.tanggal} • ${current.waktuShalat}",
+                        color = MaterialTheme.styles.mutedForeground
+                    )
+                    RadioGroup(
+                        selectedValue = editStatus,
+                        onValueChange = { editStatus = it },
+                        orientation = LayoutOrientation.Vertical
+                    ) {
+                        listOf("Mengikuti", "Ijin", "Tidak Mengikuti", "Telat").forEach { status ->
+                            RadioButtonWithLabel(value = status, label = status)
                         }
                     }
                 }
             },
-            confirmButton = { Button(onClick = { viewModel.perbaruiAbsensi(absensiToEdit!!.copy(status = editStatus)); absensiToEdit = null }, colors = ButtonDefaults.buttonColors(containerColor = WarnaUtama)) { Text("Simpan") } },
-            dismissButton = { TextButton(onClick = { absensiToEdit = null }) { Text("Batal", color = LokalTema.current.teksSekunder) } }
+            actions = {
+                AlertDialogCancel(onClick = { absensiToEdit = null }) { Text("Batal") }
+                Spacer(Modifier.width(8.dp))
+                AlertDialogAction(
+                    onClick = {
+                        viewModel.perbaruiAbsensi(current.copy(status = editStatus))
+                        absensiToEdit = null
+                    }
+                ) { Text("Simpan") }
+            }
         )
     }
 
+    val jamaahKategori = jamaah.filter { it.kategori == tabKategori }
+    val idsKategori = jamaahKategori.map { it.id }.toSet()
+    val absensiKategori = absensi.filter { it.jamaahId in idsKategori }
+
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+        Text("Rekap & Peringkat", style = MaterialTheme.komoTypography.titleLarge)
+        Text(
+            "Pisahkan pengurus putra dan putri",
+            style = MaterialTheme.komoTypography.body,
+            color = MaterialTheme.styles.mutedForeground
+        )
+        Spacer(Modifier.height(12.dp))
+        TabsList(
+            selectedTabIndex = if (tabKategori == "Putra") 0 else 1,
+            onTabSelected = {
+                tabKategori = if (it == 0) "Putra" else "Putri"
+                selectedWeek = null
+            },
+            tabs = listOf("Putra", "Putri"),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(12.dp))
+
         if (selectedWeek == null) {
-            Text("Rekap & Peringkat Kedisiplinan", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-            Text("Pilih minggu untuk melihat poin jamaah", fontSize = 14.sp, color = LokalTema.current.teksSekunder)
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            val grouped = absensi.groupBy { getWeek(it.tanggal) }
+            val grouped = absensiKategori.groupBy { getWeek(it.tanggal) }
             if (grouped.isEmpty()) {
-                Text("Belum ada data absensi.")
+                Empty(modifier = Modifier.weight(1f)) {
+                    EmptyHeader {
+                        EmptyTitle { Text("Belum ada data absensi") }
+                        EmptyDescription { Text("Data akan muncul setelah absensi disimpan.") }
+                    }
+                }
             } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(grouped.keys.toList().sorted().reversed()) { week ->
+                        val jumlahAnak = jamaahKategori.count { j ->
+                            absensiKategori.any { it.jamaahId == j.id && getWeek(it.tanggal) == week }
+                        }
                         Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable { selectedWeek = week },
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan)
+                            modifier = Modifier.fillMaxWidth().clickable { selectedWeek = week }
                         ) {
-                            Row(modifier = Modifier.padding(20.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(week, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-                                Icon(Icons.Filled.DateRange, contentDescription = null, tint = WarnaAksen)
+                            CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(week, style = MaterialTheme.komoTypography.title)
+                                        Text(
+                                            "$jumlahAnak jamaah",
+                                            style = MaterialTheme.komoTypography.label,
+                                            color = MaterialTheme.styles.mutedForeground
+                                        )
+                                    }
+                                    Icon(
+                                        Icons.Filled.DateRange,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.styles.primary
+                                    )
+                                }
                             }
                         }
                     }
@@ -505,69 +829,203 @@ fun RekapScreen(viewModel: AppViewModel) {
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { selectedWeek = null }) { Icon(Icons.Filled.Home, contentDescription = "Kembali", tint = LokalTema.current.utama) }
-                Text(selectedWeek!!, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
+                IconButton(onClick = { selectedWeek = null }) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
+                }
+                Text(selectedWeek!!, style = MaterialTheme.komoTypography.titleLarge)
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
 
-            var tabKategori by remember { mutableStateOf("Putra") }
-            TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = LokalTema.current.permukaan, contentColor = LokalTema.current.utama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
-                Tab(selected = tabKategori == "Putra", onClick = { tabKategori = "Putra" }, text = { Text("👦 Putra") })
-                Tab(selected = tabKategori == "Putri", onClick = { tabKategori = "Putri" }, text = { Text("🧕 Putri") })
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-
-            val weekData = absensi.filter { getWeek(it.tanggal) == selectedWeek }
-            // Filter berdasarkan kategori yang sedang dipilih di tab
-            val jamaahInWeek = jamaah.filter { j -> j.kategori == tabKategori && weekData.any { it.jamaahId == j.id } }
-
-            val rankedJamaah = jamaahInWeek.map { j ->
-                val dataJamaah = weekData.filter { it.jamaahId == j.id }
-                val alpha = dataJamaah.count { it.status == "Tidak Mengikuti" }
-                val telat = dataJamaah.count { it.status == "Telat" }
-                val finalPoint = 70 - (alpha * 2) - (telat * 1)
-                Triple(j, dataJamaah.sortedBy { it.tanggal }, finalPoint)
+            val weekData = absensiKategori.filter { getWeek(it.tanggal) == selectedWeek }
+            val jamaahInWeek = jamaahKategori.filter { j -> weekData.any { it.jamaahId == j.id } }
+            val ranked = jamaahInWeek.map { j ->
+                val data = weekData.filter { it.jamaahId == j.id }
+                val alpha = data.count { it.status == "Tidak Mengikuti" }
+                val telat = data.count { it.status == "Telat" }
+                Triple(j, data.sortedBy { it.tanggal }, 70 - (alpha * 2) - telat)
             }.sortedByDescending { it.third }
 
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                itemsIndexed(rankedJamaah) { index, (j, dataJamaah, point) ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                        colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan)
+            if (ranked.isEmpty()) {
+                Empty(modifier = Modifier.weight(1f)) {
+                    EmptyHeader {
+                        EmptyTitle { Text("Belum ada jamaah") }
+                        EmptyDescription { Text("Belum ada absensi pada minggu ini.") }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    itemsIndexed(ranked, key = { _, item -> item.first.id }) { index, item ->
+                        val (j, dataJamaah, point) = item
+                        RekapJamaahCard(
+                            index = index,
+                            jamaah = j,
+                            dataJamaah = dataJamaah,
+                            point = point,
+                            onEdit = { absensiToEdit = it }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RekapJamaahCard(
+    index: Int,
+    jamaah: Jamaah,
+    dataJamaah: List<Absensi>,
+    point: Int,
+    onEdit: (Absensi) -> Unit
+) {
+    var detailOpen by remember(jamaah.id) { mutableStateOf(false) }
+    val statusCounts = listOf(
+        "Mengikuti" to "Hadir",
+        "Ijin" to "Ijin",
+        "Telat" to "Telat",
+        "Tidak Mengikuti" to "Alpha"
+    ).map { (status, label) ->
+        BarPoint(label, dataJamaah.count { it.status == status }.toFloat())
+    }
+    val daily = dataJamaah.groupBy { it.tanggal }.toSortedMap().map { (tanggal, list) ->
+        LinePoint(formatTanggalSingkat(tanggal), list.count { it.status == "Mengikuti" }.toFloat())
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when (index) {
+                                0 -> MaterialTheme.styles.chart3
+                                1 -> MaterialTheme.styles.mutedForeground
+                                2 -> MaterialTheme.styles.chart5
+                                else -> MaterialTheme.styles.primary
+                            }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "#${index + 1}",
+                        color = Color.White,
+                        style = MaterialTheme.komoTypography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Avatar(model = null, fallbackText = inisial(jamaah.nama), size = 40.dp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(jamaah.nama, style = MaterialTheme.komoTypography.title)
+                    Text(
+                        "Poin disiplin: $point",
+                        style = MaterialTheme.komoTypography.label,
+                        color = if (point < 50) {
+                            MaterialTheme.styles.destructive
+                        } else {
+                            MaterialTheme.styles.mutedForeground
+                        }
+                    )
+                }
+                Badge(
+                    variant = if (point < 50) BadgeVariant.Destructive else BadgeVariant.Secondary
+                ) {
+                    Text("$point")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Progress(progress = point.coerceIn(0, 70) / 70f, height = 8.dp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Status Mingguan",
+                style = MaterialTheme.komoTypography.labelMedium,
+                color = MaterialTheme.styles.mutedForeground
+            )
+            BarChart(
+                series = listOf(
+                    BarSeries(
+                        key = "status-${jamaah.id}",
+                        label = "Jumlah",
+                        color = MaterialTheme.styles.primary,
+                        points = statusCounts
+                    )
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                chartHeight = 160.dp,
+                showTooltip = false,
+                showValueLabels = true,
+                axisOptions = ChartAxisOptions(
+                    yTickCount = 3,
+                    yLabelFormatter = { it.toInt().toString() }
+                )
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Tren Harian (Mengikuti)",
+                style = MaterialTheme.komoTypography.labelMedium,
+                color = MaterialTheme.styles.mutedForeground
+            )
+            LineChart(
+                series = listOf(
+                    LineSeries(
+                        key = "harian-${jamaah.id}",
+                        label = "Mengikuti",
+                        color = MaterialTheme.styles.chart2,
+                        points = daily
+                    )
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                chartHeight = 160.dp,
+                showTooltip = false,
+                axisOptions = ChartAxisOptions(
+                    yDomain = 0f..5f,
+                    yTickCount = 3,
+                    yLabelFormatter = { it.toInt().toString() }
+                )
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { detailOpen = !detailOpen },
+                variant = ButtonVariant.Outline,
+                size = ButtonSize.Sm
+            ) {
+                Text(if (detailOpen) "Sembunyikan Detail" else "Lihat Detail Absensi")
+            }
+            if (detailOpen) {
+                Spacer(Modifier.height(8.dp))
+                dataJamaah.forEach { ab ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(18.dp))
-                                            .background(if (index == 0) WarnaAksen else if (index == 1) Color(0xFFB0BEC5) else if (index == 2) Color(0xFFCD7F32) else WarnaUtama),
-                                        contentAlignment = Alignment.Center
-                                    ) { Text("#${index + 1}", color = Color.White, fontWeight = FontWeight.Bold) }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(j.nama, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-                                        Text("Poin Disiplin: $point", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if(point < 50) Color.Red else WarnaAksen)
-                                    }
-                                }
-                            }
-                            Divider(modifier = Modifier.padding(vertical = 12.dp))
-                            dataJamaah.forEach { ab ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text("${ab.tanggal} - ${ab.waktuShalat}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text("Status: ${ab.status}", fontSize = 12.sp, color = if(ab.status == "Mengikuti") Color(0xFF2E7D32) else Color.Red)
-                                    }
-                                    OutlinedButton(onClick = { absensiToEdit = ab }, shape = RoundedCornerShape(8.dp)) { Text("Edit") }
-                                }
-                            }
+                        Column {
+                            Text(
+                                "${ab.tanggal} • ${ab.waktuShalat}",
+                                style = MaterialTheme.komoTypography.labelMedium
+                            )
+                            Text(
+                                ab.status,
+                                style = MaterialTheme.komoTypography.label,
+                                color = MaterialTheme.styles.mutedForeground
+                            )
+                        }
+                        Button(
+                            onClick = { onEdit(ab) },
+                            variant = ButtonVariant.Ghost,
+                            size = ButtonSize.Sm
+                        ) {
+                            Text("Edit")
                         }
                     }
+                    HorizontalDivider()
                 }
             }
         }
@@ -576,129 +1034,232 @@ fun RekapScreen(viewModel: AppViewModel) {
 
 @Composable
 fun JamaahScreen(viewModel: AppViewModel) {
-    val jamaahList = viewModel.jamaahList.collectAsState().value
+    val jamaahList by viewModel.jamaahList.collectAsState()
     var idSantri by remember { mutableStateOf("") }
     var nama by remember { mutableStateOf("") }
     var kelas by remember { mutableStateOf("") }
     var alamat by remember { mutableStateOf("") }
-    var kategori by remember { mutableStateOf("Putra") } // Form Kategori
-    
-    var tabKategori by remember { mutableStateOf("Putra") } // Tab List
+    var kategori by remember { mutableStateOf("Putra") }
+    var tabKategori by remember { mutableStateOf("Putra") }
     var jamaahToEdit by remember { mutableStateOf<Jamaah?>(null) }
 
-    if (jamaahToEdit != null) {
-        var editId by remember { mutableStateOf(jamaahToEdit!!.idSantri) }
-        var editNama by remember { mutableStateOf(jamaahToEdit!!.nama) }
-        var editKelas by remember { mutableStateOf(jamaahToEdit!!.kelas) }
-        var editAlamat by remember { mutableStateOf(jamaahToEdit!!.alamat) }
-        var editKategori by remember { mutableStateOf(jamaahToEdit!!.kategori) }
+    jamaahToEdit?.let { current ->
+        var editId by remember(current.id) { mutableStateOf(current.idSantri) }
+        var editNama by remember(current.id) { mutableStateOf(current.nama) }
+        var editKelas by remember(current.id) { mutableStateOf(current.kelas) }
+        var editAlamat by remember(current.id) { mutableStateOf(current.alamat) }
+        var editKategori by remember(current.id) { mutableStateOf(current.kategori) }
 
-        AlertDialog(
+        Dialog(
+            open = true,
             onDismissRequest = { jamaahToEdit = null },
-            title = { Text("Edit / Hapus Jamaah", color = LokalTema.current.utama, fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    OutlinedTextField(value = editId, onValueChange = { editId = it }, label = { Text("ID QR") })
-                    OutlinedTextField(value = editNama, onValueChange = { editNama = it }, label = { Text("Nama") })
-                    OutlinedTextField(value = editKelas, onValueChange = { editKelas = it }, label = { Text("Kelas") })
-                    OutlinedTextField(value = editAlamat, onValueChange = { editAlamat = it }, label = { Text("Alamat") })
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Kategori: ", fontWeight = FontWeight.Bold)
-                        RadioButton(selected = editKategori == "Putra", onClick = { editKategori = "Putra" })
-                        Text("Putra")
-                        RadioButton(selected = editKategori == "Putri", onClick = { editKategori = "Putri" })
-                        Text("Putri")
-                    }
+            header = {
+                DialogTitle { Text("Edit / Hapus Jamaah") }
+                DialogDescription { Text("Perbarui data atau hapus jamaah ini.") }
+            },
+            body = {
+                Input(
+                    value = editId,
+                    onValueChange = { editId = it },
+                    placeholder = "ID QR",
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                Input(
+                    value = editNama,
+                    onValueChange = { editNama = it },
+                    placeholder = "Nama",
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                Input(
+                    value = editKelas,
+                    onValueChange = { editKelas = it },
+                    placeholder = "Kamar/Kelas",
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                Input(
+                    value = editAlamat,
+                    onValueChange = { editAlamat = it },
+                    placeholder = "Asal",
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Kategori",
+                    style = MaterialTheme.komoTypography.labelMedium,
+                    color = MaterialTheme.styles.mutedForeground
+                )
+                RadioGroup(
+                    selectedValue = editKategori,
+                    onValueChange = { editKategori = it },
+                    orientation = LayoutOrientation.Horizontal
+                ) {
+                    RadioButtonWithLabel(value = "Putra", label = "Putra")
+                    RadioButtonWithLabel(value = "Putri", label = "Putri")
                 }
             },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.perbaruiJamaah(jamaahToEdit!!.copy(idSantri = editId, nama = editNama, kelas = editKelas, alamat = editAlamat, kategori = editKategori))
-                    jamaahToEdit = null
-                }, colors = ButtonDefaults.buttonColors(containerColor = WarnaUtama)) { Text("Simpan") }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.hapusJamaah(jamaahToEdit!!); jamaahToEdit = null }) { Text("Hapus", color = Color.Red) }
+            footer = {
+                Button(
+                    onClick = {
+                        viewModel.hapusJamaah(current)
+                        jamaahToEdit = null
+                    },
+                    variant = ButtonVariant.Destructive
+                ) {
+                    Text("Hapus")
+                }
+                Spacer(Modifier.weight(1f))
+                Button(onClick = { jamaahToEdit = null }, variant = ButtonVariant.Outline) {
+                    Text("Batal")
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        viewModel.perbaruiJamaah(
+                            current.copy(
+                                idSantri = editId,
+                                nama = editNama,
+                                kelas = editKelas,
+                                alamat = editAlamat,
+                                kategori = editKategori
+                            )
+                        )
+                        jamaahToEdit = null
+                    }
+                ) {
+                    Text("Simpan")
+                }
             }
         )
     }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        Text("Kelola Data Jamaah", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                OutlinedTextField(value = idSantri, onValueChange = { idSantri = it }, label = { Text("ID QR Code (Contoh: QR001)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = nama, onValueChange = { nama = it }, label = { Text("Nama Lengkap") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = kelas, onValueChange = { kelas = it }, label = { Text("Kamar/Kelas") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
-                    OutlinedTextField(value = alamat, onValueChange = { alamat = it }, label = { Text("Asal") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                CardHeader {
+                    CardTitle { Text("Kelola Data Jamaah") }
+                    CardDescription { Text("Daftarkan santri dan pisahkan berdasarkan kategori.") }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                // --- Kategori Radio Button ---
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text("Kategori: ", fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { kategori = "Putra" }.padding(4.dp)) {
-                        RadioButton(selected = kategori == "Putra", onClick = { kategori = "Putra" })
-                        Text("Putra")
+                CardContent {
+                    Input(
+                        value = idSantri,
+                        onValueChange = { idSantri = it },
+                        placeholder = "ID QR (contoh: QR001)",
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Input(
+                        value = nama,
+                        onValueChange = { nama = it },
+                        placeholder = "Nama lengkap",
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Input(
+                            value = kelas,
+                            onValueChange = { kelas = it },
+                            placeholder = "Kamar/Kelas",
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        Input(
+                            value = alamat,
+                            onValueChange = { alamat = it },
+                            placeholder = "Asal",
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { kategori = "Putri" }.padding(4.dp)) {
-                        RadioButton(selected = kategori == "Putri", onClick = { kategori = "Putri" })
-                        Text("Putri")
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Kategori",
+                        style = MaterialTheme.komoTypography.labelMedium,
+                        color = MaterialTheme.styles.mutedForeground
+                    )
+                    RadioGroup(
+                        selectedValue = kategori,
+                        onValueChange = { kategori = it },
+                        orientation = LayoutOrientation.Horizontal
+                    ) {
+                        RadioButtonWithLabel(value = "Putra", label = "Putra")
+                        RadioButtonWithLabel(value = "Putri", label = "Putri")
                     }
                 }
-                
-                Button(
-                    onClick = { 
-                        if(nama.isNotBlank() && idSantri.isNotBlank()) {
-                            viewModel.tambahJamaah(idSantri, nama, kelas, alamat, kategori)
-                            idSantri = ""; nama = ""; kelas = ""; alamat = ""
-                        }
-                    }, 
-                    modifier = Modifier.padding(top = 16.dp).fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = WarnaAksen)
-                ) {
-                    Text("Tambahkan Jamaah Baru", color = WarnaUtama, fontWeight = FontWeight.Bold)
+                CardFooter {
+                    Button(
+                        onClick = {
+                            if (nama.isNotBlank() && idSantri.isNotBlank()) {
+                                viewModel.tambahJamaah(idSantri, nama, kelas, alamat, kategori)
+                                idSantri = ""
+                                nama = ""
+                                kelas = ""
+                                alamat = ""
+                            }
+                        },
+                        fullWidth = true
+                    ) {
+                        Text("Tambahkan Jamaah Baru")
+                    }
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // --- Tab Filter List ---
-        TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = LokalTema.current.permukaan, contentColor = LokalTema.current.utama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
-            Tab(selected = tabKategori == "Putra", onClick = { tabKategori = "Putra" }, text = { Text("👦 Daftar Putra") })
-            Tab(selected = tabKategori == "Putri", onClick = { tabKategori = "Putri" }, text = { Text("🧕 Daftar Putri") })
+        item {
+            TabsList(
+                selectedTabIndex = if (tabKategori == "Putra") 0 else 1,
+                onTabSelected = { tabKategori = if (it == 0) "Putra" else "Putri" },
+                tabs = listOf("Daftar Putra", "Daftar Putri"),
+                modifier = Modifier.fillMaxWidth()
+            )
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        val filteredJamaah = jamaahList.filter { it.kategori == tabKategori }
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(filteredJamaah) { jamaah ->
+
+        val filtered = jamaahList.filter { it.kategori == tabKategori }
+        if (filtered.isEmpty()) {
+            item {
+                Empty {
+                    EmptyHeader {
+                        EmptyTitle { Text("Belum ada jamaah") }
+                        EmptyDescription { Text("Tambahkan data pada formulir di atas.") }
+                    }
+                }
+            }
+        } else {
+            items(filtered, key = { it.id }) { jamaah ->
                 Card(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { jamaahToEdit = jamaah },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    modifier = Modifier.fillMaxWidth().clickable { jamaahToEdit = jamaah }
                 ) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text(jamaah.nama, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-                            Text("ID: ${jamaah.idSantri} | Kamar: ${jamaah.kelas}", fontSize = 12.sp, color = LokalTema.current.teksSekunder)
+                    CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Avatar(model = null, fallbackText = inisial(jamaah.nama), size = 40.dp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(jamaah.nama, style = MaterialTheme.komoTypography.title)
+                                Text(
+                                    "ID ${jamaah.idSantri} • ${jamaah.kelas}",
+                                    style = MaterialTheme.komoTypography.label,
+                                    color = MaterialTheme.styles.mutedForeground
+                                )
+                            }
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = "Edit",
+                                tint = MaterialTheme.styles.primary
+                            )
                         }
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = WarnaAksen)
                     }
                 }
             }
@@ -707,49 +1268,95 @@ fun JamaahScreen(viewModel: AppViewModel) {
 }
 
 @Composable
-fun PengaturanScreen(viewModel: AppViewModel) {
+fun PengaturanScreen(
+    viewModel: AppViewModel,
+    isDarkMode: Boolean,
+    onToggleTheme: () -> Unit
+) {
     var showDialog by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        Text("Pengaturan", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text("Informasi Aplikasi", fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                Text("Versi: 4.0 (Pemisahan Putra & Putri)")
-                Text("Database: Cloud Realtime Firestore")
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                Text("Sistem Database", fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                Button(
-                    onClick = { showDialog = true }, 
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Reset & Masukkan Data Dummy Awal")
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                CardHeader {
+                    CardTitle { Text("Informasi Aplikasi") }
+                    CardDescription { Text("Absensi Jamaah • KomoUI") }
+                }
+                CardContent {
+                    Text("Versi 4.0 (Pemisahan Putra & Putri)", style = MaterialTheme.komoTypography.body)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Database: Cloud Realtime Firestore",
+                        style = MaterialTheme.komoTypography.body,
+                        color = MaterialTheme.styles.mutedForeground
+                    )
                 }
             }
         }
-
-        if (showDialog) {
-            AlertDialog(
-                onDismissRequest = { showDialog = false },
-                title = { Text("Konfirmasi Reset") },
-                text = { Text("Yakin ingin mereset Cloud Database? Semua data saat ini akan terhapus diganti dengan data dummy awal.") },
-                confirmButton = {
-                    Button(onClick = { viewModel.resetData(); showDialog = false }, colors = ButtonDefaults.buttonColors(containerColor = WarnaUtama)) { Text("Ya, Reset") }
-                },
-                dismissButton = { TextButton(onClick = { showDialog = false }) { Text("Batal", color = LokalTema.current.teksSekunder) } }
-            )
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Mode Gelap", style = MaterialTheme.komoTypography.title)
+                            Text(
+                                "Ikuti preferensi tampilan aplikasi",
+                                style = MaterialTheme.komoTypography.label,
+                                color = MaterialTheme.styles.mutedForeground
+                            )
+                        }
+                        Switch(checked = isDarkMode, onCheckedChange = { onToggleTheme() })
+                    }
+                }
+            }
+        }
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                CardHeader {
+                    CardTitle { Text("Sistem Database") }
+                    CardDescription {
+                        Text("Tindakan ini menghapus seluruh data dan mengisi data dummy.")
+                    }
+                }
+                CardFooter {
+                    Button(
+                        onClick = { showDialog = true },
+                        variant = ButtonVariant.Destructive,
+                        fullWidth = true
+                    ) {
+                        Text("Reset & Masukkan Data Dummy Awal")
+                    }
+                }
+            }
         }
     }
+
+    AlertDialog(
+        open = showDialog,
+        onDismissRequest = { showDialog = false },
+        title = { AlertDialogTitle { Text("Konfirmasi Reset") } },
+        description = {
+            AlertDialogDescription {
+                Text("Yakin ingin mereset Cloud Database? Semua data saat ini akan terhapus diganti dengan data dummy awal.")
+            }
+        },
+        actions = {
+            AlertDialogCancel(onClick = { showDialog = false }) { Text("Batal") }
+            Spacer(Modifier.width(8.dp))
+            AlertDialogAction(
+                onClick = {
+                    viewModel.resetData()
+                    showDialog = false
+                }
+            ) { Text("Ya, Reset") }
+        }
+    )
 }
