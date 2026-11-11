@@ -43,20 +43,34 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-val WarnaUtama = Color(0xFF00695C)
-val WarnaAksen = Color(0xFFF5A623)
-val WarnaBg = Color(0xFFF1F8E9)
-val WarnaPermukaan = Color(0xFFFFFFFF)
-
 @Composable
-fun MainAppScreen(viewModel: AppViewModel) {
+fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: () -> Unit) {
     var currentScreen by remember { mutableStateOf("Dashboard") }
     val screens = listOf("Dashboard", "Absensi", "Rekap", "Jamaah", "Pengaturan")
     val icons = listOf(Icons.Filled.Home, Icons.Filled.Edit, Icons.Filled.DateRange, Icons.Filled.Person, Icons.Filled.Settings)
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Absensi Jamaah", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = onToggleTheme) {
+                        Icon(
+                            painter = painterResource(id = if (isDarkMode) R.drawable.ic_sun else R.drawable.ic_moon),
+                            contentDescription = if (isDarkMode) "Ubah ke mode terang" else "Ubah ke mode gelap",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = WarnaUtama,
+                    titleContentColor = Color.White,
+                    actionIconContentColor = Color.White
+                )
+            )
+        },
         bottomBar = {
-            NavigationBar(containerColor = WarnaPermukaan, tonalElevation = 8.dp) {
+            NavigationBar(containerColor = LokalTema.current.permukaan, tonalElevation = 8.dp) {
                 screens.forEachIndexed { index, title ->
                     NavigationBarItem(
                         icon = { Icon(icons[index], contentDescription = title) },
@@ -64,17 +78,17 @@ fun MainAppScreen(viewModel: AppViewModel) {
                         selected = currentScreen == title,
                         onClick = { currentScreen = title },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = WarnaPermukaan,
-                            selectedTextColor = WarnaUtama,
-                            indicatorColor = WarnaUtama,
-                            unselectedIconColor = Color.Gray
+                            selectedIconColor = Color.White,
+                            selectedTextColor = LokalTema.current.utama,
+                            indicatorColor = LokalTema.current.utama,
+                            unselectedIconColor = LokalTema.current.teksSekunder
                         )
                     )
                 }
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues).fillMaxSize().background(WarnaBg)) {
+        Box(modifier = Modifier.padding(paddingValues).fillMaxSize().background(LokalTema.current.latar)) {
             when (currentScreen) {
                 "Dashboard" -> DashboardScreen(viewModel) { currentScreen = "Absensi" }
                 "Absensi" -> AbsensiScreen(viewModel)
@@ -129,8 +143,8 @@ fun DashboardScreen(viewModel: AppViewModel, onMulaiAbsensi: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text("Assalamualaikum,", fontSize = 16.sp, color = Color.Gray)
-                Text("Ringkasan Hari Ini", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
+                Text("Assalamualaikum,", fontSize = 16.sp, color = LokalTema.current.teksSekunder)
+                Text("Ringkasan Hari Ini", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
             }
         }
         
@@ -178,7 +192,7 @@ fun AbsensiScreen(viewModel: AppViewModel) {
     val tabs = listOf("Manual", "Scan Kamera")
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = modeAbsensi, containerColor = WarnaPermukaan, contentColor = WarnaUtama) {
+        TabRow(selectedTabIndex = modeAbsensi, containerColor = LokalTema.current.permukaan, contentColor = LokalTema.current.utama) {
             tabs.forEachIndexed { index, title ->
                 Tab(selected = modeAbsensi == index, onClick = { modeAbsensi = index }, text = { Text(title, fontWeight = FontWeight.Bold) })
             }
@@ -224,7 +238,7 @@ fun AbsensiManualView(viewModel: AppViewModel) {
             }
         }
 
-        TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = WarnaPermukaan, contentColor = WarnaUtama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
+        TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = LokalTema.current.permukaan, contentColor = LokalTema.current.utama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
             Tab(selected = tabKategori == "Putra", onClick = { tabKategori = "Putra" }, text = { Text("👦 Putra") })
             Tab(selected = tabKategori == "Putri", onClick = { tabKategori = "Putri" }, text = { Text("🧕 Putri") })
         }
@@ -233,7 +247,7 @@ fun AbsensiManualView(viewModel: AppViewModel) {
         if (errorMessage.isNotEmpty()) {
             Text(errorMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
         } else if (successMessage.isNotEmpty()) {
-            Text(successMessage, color = WarnaUtama, fontWeight = FontWeight.Bold)
+            Text(successMessage, color = LokalTema.current.utama, fontWeight = FontWeight.Bold)
         } else {
             val filteredJamaah = jamaahList.filter { it.kategori == tabKategori }
             
@@ -243,10 +257,10 @@ fun AbsensiManualView(viewModel: AppViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = WarnaPermukaan)
+                        colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("${jamaah.nama} (${jamaah.kelas})", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
+                            Text("${jamaah.nama} (${jamaah.kelas})", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
                             Divider(modifier = Modifier.padding(vertical = 8.dp))
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 listOf("Mengikuti", "Ijin").forEach { status ->
@@ -451,7 +465,7 @@ fun RekapScreen(viewModel: AppViewModel) {
 
         AlertDialog(
             onDismissRequest = { absensiToEdit = null },
-            title = { Text("Edit Absensi", color = WarnaUtama, fontWeight = FontWeight.Bold) },
+            title = { Text("Edit Absensi", color = LokalTema.current.utama, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     Text("Nama: $jamaahName", fontWeight = FontWeight.Bold)
@@ -466,14 +480,14 @@ fun RekapScreen(viewModel: AppViewModel) {
                 }
             },
             confirmButton = { Button(onClick = { viewModel.perbaruiAbsensi(absensiToEdit!!.copy(status = editStatus)); absensiToEdit = null }, colors = ButtonDefaults.buttonColors(containerColor = WarnaUtama)) { Text("Simpan") } },
-            dismissButton = { TextButton(onClick = { absensiToEdit = null }) { Text("Batal", color = Color.Gray) } }
+            dismissButton = { TextButton(onClick = { absensiToEdit = null }) { Text("Batal", color = LokalTema.current.teksSekunder) } }
         )
     }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
         if (selectedWeek == null) {
-            Text("Rekap & Peringkat Kedisiplinan", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
-            Text("Pilih minggu untuk melihat poin jamaah", fontSize = 14.sp, color = Color.Gray)
+            Text("Rekap & Peringkat Kedisiplinan", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
+            Text("Pilih minggu untuk melihat poin jamaah", fontSize = 14.sp, color = LokalTema.current.teksSekunder)
             Spacer(modifier = Modifier.height(16.dp))
             
             val grouped = absensi.groupBy { getWeek(it.tanggal) }
@@ -486,10 +500,10 @@ fun RekapScreen(viewModel: AppViewModel) {
                             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable { selectedWeek = week },
                             shape = RoundedCornerShape(16.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = WarnaPermukaan)
+                            colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan)
                         ) {
                             Row(modifier = Modifier.padding(20.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(week, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
+                                Text(week, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
                                 Icon(Icons.Filled.DateRange, contentDescription = null, tint = WarnaAksen)
                             }
                         }
@@ -498,13 +512,13 @@ fun RekapScreen(viewModel: AppViewModel) {
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { selectedWeek = null }) { Icon(Icons.Filled.Home, contentDescription = "Kembali", tint = WarnaUtama) }
-                Text(selectedWeek!!, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
+                IconButton(onClick = { selectedWeek = null }) { Icon(Icons.Filled.Home, contentDescription = "Kembali", tint = LokalTema.current.utama) }
+                Text(selectedWeek!!, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
             }
             Spacer(modifier = Modifier.height(12.dp))
 
             var tabKategori by remember { mutableStateOf("Putra") }
-            TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = WarnaPermukaan, contentColor = WarnaUtama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
+            TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = LokalTema.current.permukaan, contentColor = LokalTema.current.utama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
                 Tab(selected = tabKategori == "Putra", onClick = { tabKategori = "Putra" }, text = { Text("👦 Putra") })
                 Tab(selected = tabKategori == "Putri", onClick = { tabKategori = "Putri" }, text = { Text("🧕 Putri") })
             }
@@ -528,7 +542,7 @@ fun RekapScreen(viewModel: AppViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                        colors = CardDefaults.cardColors(containerColor = WarnaPermukaan)
+                        colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -540,7 +554,7 @@ fun RekapScreen(viewModel: AppViewModel) {
                                     ) { Text("#${index + 1}", color = Color.White, fontWeight = FontWeight.Bold) }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text(j.nama, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
+                                        Text(j.nama, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
                                         Text("Poin Disiplin: $point", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if(point < 50) Color.Red else WarnaAksen)
                                     }
                                 }
@@ -588,7 +602,7 @@ fun JamaahScreen(viewModel: AppViewModel) {
 
         AlertDialog(
             onDismissRequest = { jamaahToEdit = null },
-            title = { Text("Edit / Hapus Jamaah", color = WarnaUtama, fontWeight = FontWeight.Bold) },
+            title = { Text("Edit / Hapus Jamaah", color = LokalTema.current.utama, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     OutlinedTextField(value = editId, onValueChange = { editId = it }, label = { Text("ID QR") })
@@ -618,14 +632,14 @@ fun JamaahScreen(viewModel: AppViewModel) {
     }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        Text("Kelola Data Jamaah", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
+        Text("Kelola Data Jamaah", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
         Spacer(modifier = Modifier.height(12.dp))
         
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            colors = CardDefaults.cardColors(containerColor = WarnaPermukaan)
+            colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 OutlinedTextField(value = idSantri, onValueChange = { idSantri = it }, label = { Text("ID QR Code (Contoh: QR001)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
@@ -639,7 +653,7 @@ fun JamaahScreen(viewModel: AppViewModel) {
                 Spacer(modifier = Modifier.height(8.dp))
                 // --- Kategori Radio Button ---
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text("Kategori: ", fontWeight = FontWeight.Bold, color = WarnaUtama)
+                    Text("Kategori: ", fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
                     Spacer(modifier = Modifier.width(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { kategori = "Putra" }.padding(4.dp)) {
                         RadioButton(selected = kategori == "Putra", onClick = { kategori = "Putra" })
@@ -671,7 +685,7 @@ fun JamaahScreen(viewModel: AppViewModel) {
         Spacer(modifier = Modifier.height(16.dp))
         
         // --- Tab Filter List ---
-        TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = WarnaPermukaan, contentColor = WarnaUtama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
+        TabRow(selectedTabIndex = if (tabKategori == "Putra") 0 else 1, containerColor = LokalTema.current.permukaan, contentColor = LokalTema.current.utama, modifier = Modifier.clip(RoundedCornerShape(8.dp))) {
             Tab(selected = tabKategori == "Putra", onClick = { tabKategori = "Putra" }, text = { Text("👦 Daftar Putra") })
             Tab(selected = tabKategori == "Putri", onClick = { tabKategori = "Putri" }, text = { Text("🧕 Daftar Putri") })
         }
@@ -683,13 +697,13 @@ fun JamaahScreen(viewModel: AppViewModel) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { jamaahToEdit = jamaah },
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = WarnaPermukaan),
+                    colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
-                            Text(jamaah.nama, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
-                            Text("ID: ${jamaah.idSantri} | Kamar: ${jamaah.kelas}", fontSize = 12.sp, color = Color.Gray)
+                            Text(jamaah.nama, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
+                            Text("ID: ${jamaah.idSantri} | Kamar: ${jamaah.kelas}", fontSize = 12.sp, color = LokalTema.current.teksSekunder)
                         }
                         Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = WarnaAksen)
                     }
@@ -704,23 +718,23 @@ fun PengaturanScreen(viewModel: AppViewModel) {
     var showDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-        Text("Pengaturan", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = WarnaUtama)
+        Text("Pengaturan", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
         Spacer(modifier = Modifier.height(16.dp))
         
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = WarnaPermukaan),
+            colors = CardDefaults.cardColors(containerColor = LokalTema.current.permukaan),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Informasi Aplikasi", fontWeight = FontWeight.Bold, color = WarnaUtama)
+                Text("Informasi Aplikasi", fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
                 Divider(modifier = Modifier.padding(vertical = 8.dp))
                 Text("Versi: 4.0 (Pemisahan Putra & Putri)")
                 Text("Database: Cloud Realtime Firestore")
                 
                 Spacer(modifier = Modifier.height(24.dp))
-                Text("Sistem Database", fontWeight = FontWeight.Bold, color = WarnaUtama)
+                Text("Sistem Database", fontWeight = FontWeight.Bold, color = LokalTema.current.utama)
                 Divider(modifier = Modifier.padding(vertical = 8.dp))
                 Button(
                     onClick = { showDialog = true }, 
@@ -741,7 +755,7 @@ fun PengaturanScreen(viewModel: AppViewModel) {
                 confirmButton = {
                     Button(onClick = { viewModel.resetData(); showDialog = false }, colors = ButtonDefaults.buttonColors(containerColor = WarnaUtama)) { Text("Ya, Reset") }
                 },
-                dismissButton = { TextButton(onClick = { showDialog = false }) { Text("Batal", color = Color.Gray) } }
+                dismissButton = { TextButton(onClick = { showDialog = false }) { Text("Batal", color = LokalTema.current.teksSekunder) } }
             )
         }
     }
