@@ -90,12 +90,6 @@ import com.komoui.components.BadgeVariant
 import com.komoui.components.Button
 import com.komoui.components.ButtonSize
 import com.komoui.components.ButtonVariant
-import com.komoui.components.Card
-import com.komoui.components.CardContent
-import com.komoui.components.CardDescription
-import com.komoui.components.CardFooter
-import com.komoui.components.CardHeader
-import com.komoui.components.CardTitle
 import com.komoui.components.Dialog
 import com.komoui.components.DialogDescription
 import com.komoui.components.DialogTitle
@@ -152,7 +146,7 @@ fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: (
     )
 
     Scaffold(
-        containerColor = MaterialTheme.styles.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Absensi Jamaah", fontWeight = FontWeight.Bold) },
@@ -166,14 +160,14 @@ fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: (
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.styles.card,
+                    containerColor = MaterialTheme.styles.card.copy(alpha = 0.72f),
                     titleContentColor = MaterialTheme.styles.foreground,
                     actionIconContentColor = MaterialTheme.styles.foreground
                 )
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.styles.card, tonalElevation = 0.dp) {
+            NavigationBar(containerColor = MaterialTheme.styles.card.copy(alpha = 0.78f), tonalElevation = 0.dp) {
                 screens.forEachIndexed { index, title ->
                     NavigationBarItem(
                         icon = { Icon(icons[index], contentDescription = title) },
@@ -196,7 +190,7 @@ fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: (
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
-                .background(MaterialTheme.styles.background)
+                .background(Color.Transparent)
         ) {
             when (currentScreen) {
                 "Dashboard" -> DashboardScreen(viewModel) { currentScreen = "Absensi" }
