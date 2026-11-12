@@ -68,6 +68,9 @@ dependencies {
     // KomoUI — Compose Multiplatform UI components (shadcn-inspired)
     implementation("io.github.derangga:komoui:0.4.1")
 
+    // Lottie animations
+    implementation("com.airbnb.android:lottie-compose:6.7.1")
+
     // Coroutines + Firebase
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))

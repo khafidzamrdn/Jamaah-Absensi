@@ -76,6 +76,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
@@ -87,9 +91,6 @@ import com.komoui.components.AlertDialogTitle
 import com.komoui.components.Avatar
 import com.komoui.components.Badge
 import com.komoui.components.BadgeVariant
-import com.komoui.components.Button
-import com.komoui.components.ButtonSize
-import com.komoui.components.ButtonVariant
 import com.komoui.components.Dialog
 import com.komoui.components.DialogDescription
 import com.komoui.components.DialogTitle
@@ -373,6 +374,9 @@ fun AbsensiManualView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
     val absensiState = remember { mutableStateMapOf<String, String>() }
     var successMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
+    val komposisiCentang by rememberLottieComposition(
+        LottieCompositionSpec.Asset("lottie/check_pop.json")
+    )
 
     LaunchedEffect(jamaahList, waktu, tanggal) {
         successMessage = ""
@@ -413,11 +417,21 @@ fun AbsensiManualView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                     )
                     if (successMessage.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))
-                        Text(
-                            successMessage,
-                            color = MaterialTheme.styles.primary,
-                            style = MaterialTheme.komoTypography.bodyMedium
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            LottieAnimation(
+                                composition = komposisiCentang,
+                                iterations = 1,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Text(
+                                successMessage,
+                                color = MaterialTheme.styles.primary,
+                                style = MaterialTheme.komoTypography.bodyMedium
+                            )
+                        }
                     }
                 }
             }
@@ -656,29 +670,33 @@ fun AbsensiScanView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                     ) {
                         val sukses = scanResultMsg.contains("✅")
                         val peringatan = scanResultMsg.contains("⚠️")
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    when {
-                                        sukses -> MaterialTheme.styles.chart1
-                                        peringatan -> MaterialTheme.styles.chart3
-                                        else -> MaterialTheme.styles.destructive
-                                    }
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = when {
-                                    sukses -> Icons.Filled.Check
-                                    peringatan -> Icons.Filled.Warning
-                                    else -> Icons.Filled.Close
-                                },
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(36.dp)
+                        val komposisiCentang by rememberLottieComposition(
+                            LottieCompositionSpec.Asset("lottie/check_pop.json")
+                        )
+                        if (sukses) {
+                            LottieAnimation(
+                                composition = komposisiCentang,
+                                iterations = LottieConstants.IterateForever,
+                                modifier = Modifier.size(110.dp)
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (peringatan) MaterialTheme.styles.chart3
+                                        else MaterialTheme.styles.destructive
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (peringatan) Icons.Filled.Warning else Icons.Filled.Close,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
                         }
                         Spacer(Modifier.height(16.dp))
                         Text(
