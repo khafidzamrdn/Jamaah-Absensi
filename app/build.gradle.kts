@@ -71,6 +71,9 @@ dependencies {
     // Lottie animations
     implementation("com.airbnb.android:lottie-compose:6.7.1")
 
+    // WorkManager untuk notifikasi rekap mingguan
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
+
     // Coroutines + Firebase
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
