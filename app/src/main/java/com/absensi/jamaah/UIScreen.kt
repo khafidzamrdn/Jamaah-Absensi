@@ -7,12 +7,19 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -168,23 +175,12 @@ fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: (
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.styles.card.copy(alpha = 0.78f), tonalElevation = 0.dp) {
-                screens.forEachIndexed { index, title ->
-                    NavigationBarItem(
-                        icon = { Icon(icons[index], contentDescription = title) },
-                        label = { Text(title, fontSize = 10.sp) },
-                        selected = currentScreen == title,
-                        onClick = { currentScreen = title },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.styles.primaryForeground,
-                            selectedTextColor = MaterialTheme.styles.primary,
-                            indicatorColor = MaterialTheme.styles.primary,
-                            unselectedIconColor = MaterialTheme.styles.mutedForeground,
-                            unselectedTextColor = MaterialTheme.styles.mutedForeground
-                        )
-                    )
-                }
-            }
+            FloatingGlassNavBar(
+                screens = screens,
+                icons = icons,
+                currentScreen = currentScreen,
+                onSelect = { currentScreen = it }
+            )
         }
     ) { paddingValues ->
         Box(
@@ -193,12 +189,118 @@ fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: (
                 .fillMaxSize()
                 .background(Color.Transparent)
         ) {
-            when (currentScreen) {
-                "Dashboard" -> DashboardScreen(viewModel) { currentScreen = "Absensi" }
-                "Absensi" -> AbsensiScreen(viewModel)
-                "Rekap" -> RekapScreen(viewModel)
-                "Jamaah" -> JamaahScreen(viewModel)
-                "Pengaturan" -> PengaturanScreen(viewModel, isDarkMode, onToggleTheme)
+            AnimatedContent(
+                targetState = currentScreen,
+                transitionSpec = {
+                    val fromIndex = screens.indexOf(initialState)
+                    val toIndex = screens.indexOf(targetState)
+                    val forward = toIndex >= fromIndex
+                    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(280, easing = FastOutSlowInEasing)
+                    val fadeSpec = tween<Float>(220)
+                    if (forward) {
+                        (slideInHorizontally(slideSpec) { it } + fadeIn(fadeSpec))
+                            .togetherWith(slideOutHorizontally(slideSpec) { -it } + fadeOut(fadeSpec))
+                    } else {
+                        (slideInHorizontally(slideSpec) { -it } + fadeIn(fadeSpec))
+                            .togetherWith(slideOutHorizontally(slideSpec) { it } + fadeOut(fadeSpec))
+                    }
+                },
+                label = "ScreenSlideTransition"
+            ) { screen ->
+                when (screen) {
+                    "Dashboard" -> DashboardScreen(viewModel) { currentScreen = "Absensi" }
+                    "Absensi" -> AbsensiScreen(viewModel)
+                    "Rekap" -> RekapScreen(viewModel)
+                    "Jamaah" -> JamaahScreen(viewModel)
+                    "Pengaturan" -> PengaturanScreen(viewModel, isDarkMode, onToggleTheme)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingGlassNavBar(
+    screens: List<String>,
+    icons: List<androidx.compose.ui.graphics.vector.ImageVector>,
+    currentScreen: String,
+    onSelect: (String) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.styles.card.copy(alpha = 0.88f),
+            shadowElevation = 10.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.styles.border.copy(alpha = 0.45f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                screens.forEachIndexed { index, title ->
+                    val selected = currentScreen == title
+                    val bgColor by animateColorAsState(
+                        targetValue = if (selected) MaterialTheme.styles.primary else Color.Transparent,
+                        animationSpec = tween(250, easing = FastOutSlowInEasing),
+                        label = "NavBg"
+                    )
+                    val contentColor by animateColorAsState(
+                        targetValue = if (selected) MaterialTheme.styles.primaryForeground else MaterialTheme.styles.mutedForeground,
+                        animationSpec = tween(250),
+                        label = "NavContent"
+                    )
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (selected) 1.12f else 1f,
+                        animationSpec = tween(250, easing = FastOutSlowInEasing),
+                        label = "NavScale"
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(bgColor)
+                            .clickable { onSelect(title) }
+                            .padding(
+                                horizontal = if (selected) 14.dp else 10.dp,
+                                vertical = 9.dp
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = icons[index],
+                            contentDescription = title,
+                            tint = contentColor,
+                            modifier = Modifier.size((20 * iconScale).dp)
+                        )
+                        AnimatedVisibility(
+                            visible = selected,
+                            enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f),
+                            exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.85f)
+                        ) {
+                            Text(
+                                text = title,
+                                color = contentColor,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
             }
         }
     }
