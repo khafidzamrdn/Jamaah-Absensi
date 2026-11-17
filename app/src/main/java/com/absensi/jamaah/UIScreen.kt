@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -266,41 +267,43 @@ private fun FloatingGlassNavBar(
                     )
                     val iconScale by animateFloatAsState(
                         targetValue = if (selected) 1.12f else 1f,
-                        animationSpec = tween(250, easing = FastOutSlowInEasing),
+                        animationSpec = tween(200, easing = FastOutSlowInEasing),
                         label = "NavScale"
                     )
+                    val labelAlpha by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0.7f,
+                        animationSpec = tween(200),
+                        label = "NavAlpha"
+                    )
 
-                    Row(
+                    Column(
                         modifier = Modifier
+                            .weight(1f)
                             .clip(RoundedCornerShape(22.dp))
                             .background(bgColor)
                             .clickable { onSelect(title) }
-                            .padding(
-                                horizontal = if (selected) 14.dp else 10.dp,
-                                vertical = 9.dp
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Icon(
                             imageVector = icons[index],
                             contentDescription = title,
                             tint = contentColor,
-                            modifier = Modifier.size((20 * iconScale).dp)
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                }
                         )
-                        AnimatedVisibility(
-                            visible = selected,
-                            enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f),
-                            exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.85f)
-                        ) {
-                            Text(
-                                text = title,
-                                color = contentColor,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1
-                            )
-                        }
+                        Text(
+                            text = title,
+                            color = contentColor.copy(alpha = labelAlpha),
+                            fontSize = 10.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1
+                        )
                     }
                 }
             }
