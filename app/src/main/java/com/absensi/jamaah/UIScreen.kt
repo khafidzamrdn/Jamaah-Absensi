@@ -846,9 +846,8 @@ fun RekapScreen(viewModel: AppViewModel) {
             val ranked = jamaahInWeek.map { j ->
                 val data = weekData.filter { it.jamaahId == j.id }
                 val alpha = data.count { it.status == "Tidak Mengikuti" }
-                val telat = data.count { it.status == "Telat" }
-                Triple(j, data.sortedBy { it.tanggal }, 70 - (alpha * 2) - telat)
-            }.sortedByDescending { it.third }
+                Triple(j, data.sortedBy { it.tanggal }, alpha * 5)
+            }.sortedBy { it.third }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -958,9 +957,9 @@ private fun RekapJamaahCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(jamaah.nama, style = MaterialTheme.komoTypography.title)
                     Text(
-                        "Poin disiplin: $point",
+                        "Poin pelanggaran: $point",
                         style = MaterialTheme.komoTypography.label,
-                        color = if (point < 50) {
+                        color = if (point > 0) {
                             MaterialTheme.styles.destructive
                         } else {
                             MaterialTheme.styles.mutedForeground
@@ -968,13 +967,13 @@ private fun RekapJamaahCard(
                     )
                 }
                 Badge(
-                    variant = if (point < 50) BadgeVariant.Destructive else BadgeVariant.Secondary
+                    variant = if (point > 0) BadgeVariant.Destructive else BadgeVariant.Secondary
                 ) {
                     Text("$point")
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Progress(progress = point.coerceIn(0, 70) / 70f, height = 8.dp)
+            Progress(progress = point.coerceIn(0, 50) / 50f, height = 8.dp)
             Spacer(Modifier.height(12.dp))
             Text(
                 "Status Mingguan",
