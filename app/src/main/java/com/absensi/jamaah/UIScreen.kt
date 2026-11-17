@@ -840,14 +840,7 @@ fun RekapScreen(viewModel: AppViewModel) {
                 }
             }
         } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { selectedWeek = null }) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
-                }
-                Text(selectedWeek!!, style = MaterialTheme.komoTypography.titleLarge)
-            }
-            Spacer(Modifier.height(8.dp))
-
+            val context = androidx.compose.ui.platform.LocalContext.current
             val weekData = absensiKategori.filter { getWeek(it.tanggal) == selectedWeek }
             val jamaahInWeek = jamaahKategori.filter { j -> weekData.any { it.jamaahId == j.id } }
             val ranked = jamaahInWeek.map { j ->
@@ -856,6 +849,34 @@ fun RekapScreen(viewModel: AppViewModel) {
                 val telat = data.count { it.status == "Telat" }
                 Triple(j, data.sortedBy { it.tanggal }, 70 - (alpha * 2) - telat)
             }.sortedByDescending { it.third }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { selectedWeek = null }) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
+                }
+                Text(
+                    selectedWeek!!,
+                    style = MaterialTheme.komoTypography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = {
+                        exportWeeklyReportPdf(
+                            context = context,
+                            weekLabel = selectedWeek!!,
+                            kategori = tabKategori,
+                            ranked = ranked
+                        )
+                    },
+                    enabled = ranked.isNotEmpty()
+                ) {
+                    Text("Ekspor PDF")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
 
             if (ranked.isEmpty()) {
                 Empty(modifier = Modifier.weight(1f)) {
