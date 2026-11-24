@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
@@ -227,7 +228,9 @@ fun MainAppScreen(
                         viewModel, nfcUid, onNfcActiveChange, onBukaPengaturanNfc, nfcTersedia, nfcAktif
                     )
                     "Rekap" -> RekapScreen(viewModel)
-                    "Jamaah" -> JamaahScreen(viewModel, nfcUid, onNfcActiveChange, nfcTersedia, nfcAktif)
+                    "Jamaah" -> JamaahScreen(
+                        viewModel, nfcUid, onNfcActiveChange, onBukaPengaturanNfc, nfcTersedia, nfcAktif
+                    )
                     "Pengaturan" -> PengaturanScreen(viewModel, isDarkMode, onToggleTheme)
                 }
             }
@@ -1204,11 +1207,36 @@ fun JamaahScreen(
     viewModel: AppViewModel,
     nfcUid: SharedFlow<String>,
     onNfcActiveChange: (Boolean) -> Unit,
+    onBukaPengaturanNfc: () -> Unit,
     nfcTersedia: Boolean,
     nfcAktif: Boolean
 ) {
     val jamaahList by viewModel.jamaahList.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    var jamaahNfcTarget by remember { mutableStateOf<Jamaah?>(null) }
+    var modeDaftarKartu by remember { mutableStateOf(false) }
+    var infoKartu by remember { mutableStateOf("") }
+
+    fun mulaiDaftarKartu(jamaah: Jamaah) {
+        infoKartu = ""
+        jamaahNfcTarget = jamaah
+        modeDaftarKartu = true
+    }
+
+    DisposableEffect(modeDaftarKartu) {
+        onNfcActiveChange(modeDaftarKartu)
+        onDispose { onNfcActiveChange(false) }
+    }
+
+    LaunchedEffect(modeDaftarKartu) {
+        if (!modeDaftarKartu) return@LaunchedEffect
+        val target = jamaahNfcTarget ?: return@LaunchedEffect
+        nfcUid.collect { uid ->
+            infoKartu = viewModel.daftarkanNfc(target, uid)
+            modeDaftarKartu = false
+            jamaahNfcTarget = null
+        }
+    }
     var idSantri by remember { mutableStateOf("") }
     var nama by remember { mutableStateOf("") }
     var kelas by remember { mutableStateOf("") }
@@ -1223,24 +1251,7 @@ fun JamaahScreen(
         var editKelas by remember(current.id) { mutableStateOf(current.kelas) }
         var editAlamat by remember(current.id) { mutableStateOf(current.alamat) }
         var editKategori by remember(current.id) { mutableStateOf(current.kategori) }
-        var editNfcUid by remember(current.id) { mutableStateOf(current.nfcUid) }
-        var modeDaftarKartu by remember(current.id) { mutableStateOf(false) }
-        var infoKartu by remember(current.id) { mutableStateOf("") }
-
-        DisposableEffect(modeDaftarKartu) {
-            onNfcActiveChange(modeDaftarKartu)
-            onDispose { onNfcActiveChange(false) }
-        }
-
-        LaunchedEffect(modeDaftarKartu) {
-            if (!modeDaftarKartu) return@LaunchedEffect
-            nfcUid.collect { uid ->
-                val terbaru = jamaahList.find { it.id == current.id } ?: current
-                infoKartu = viewModel.daftarkanNfc(terbaru, uid)
-                if (infoKartu.startsWith("✅")) editNfcUid = uid
-                modeDaftarKartu = false
-            }
-        }
+        val uidTersimpan = jamaahList.find { it.id == current.id }?.nfcUid ?: current.nfcUid
 
         Dialog(
             open = true,
@@ -1302,35 +1313,53 @@ fun JamaahScreen(
                     color = MaterialTheme.styles.mutedForeground
                 )
                 Text(
-                    if (editNfcUid.isBlank()) "Belum ada kartu terdaftar."
-                    else "UID terdaftar: $editNfcUid",
+                    if (uidTersimpan.isBlank()) "Belum ada kartu terdaftar."
+                    else "UID terdaftar: $uidTersimpan",
                     style = MaterialTheme.komoTypography.body,
                     color = MaterialTheme.styles.foreground
                 )
                 Spacer(Modifier.height(8.dp))
-                if (!nfcTersedia || !nfcAktif) {
+                Button(
+                    onClick = { mulaiDaftarKartu(current) },
+                    enabled = nfcTersedia && nfcAktif && !modeDaftarKartu,
+                    loading = modeDaftarKartu && jamaahNfcTarget?.id == current.id,
+                    fullWidth = true
+                ) {
                     Text(
-                        "NFC tidak tersedia atau belum aktif di perangkat ini.",
+                        if (modeDaftarKartu && jamaahNfcTarget?.id == current.id)
+                            "Tempelkan kartu sekarang..."
+                        else "Daftarkan Kartu Baru"
+                    )
+                }
+                if (!nfcTersedia) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Perangkat ini tidak mendukung NFC.",
                         style = MaterialTheme.komoTypography.label,
                         color = MaterialTheme.styles.destructive
                     )
-                } else {
+                } else if (!nfcAktif) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "NFC masih mati. Aktifkan dulu agar kartu bisa dibaca.",
+                        style = MaterialTheme.komoTypography.label,
+                        color = MaterialTheme.styles.destructive
+                    )
+                    Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { modeDaftarKartu = true },
-                        enabled = !modeDaftarKartu,
-                        loading = modeDaftarKartu,
+                        onClick = onBukaPengaturanNfc,
+                        variant = ButtonVariant.Outline,
                         fullWidth = true
                     ) {
-                        Text(if (modeDaftarKartu) "Tempelkan kartu sekarang..." else "Daftarkan Kartu Baru")
+                        Text("Buka Pengaturan NFC")
                     }
                 }
-                if (editNfcUid.isNotBlank()) {
+                if (uidTersimpan.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Button(
                         onClick = {
                             coroutineScope.launch {
                                 infoKartu = viewModel.hapusNfc(current)
-                                editNfcUid = ""
                             }
                         },
                         variant = ButtonVariant.Outline,
@@ -1373,7 +1402,7 @@ fun JamaahScreen(
                                 kelas = editKelas,
                                 alamat = editAlamat,
                                 kategori = editKategori,
-                                nfcUid = editNfcUid
+                                nfcUid = uidTersimpan
                             )
                         )
                         jamaahToEdit = null
@@ -1483,9 +1512,7 @@ fun JamaahScreen(
             }
         } else {
             items(filtered, key = { it.id }) { jamaah ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().clickable { jamaahToEdit = jamaah }
-                ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     CardContent(modifier = Modifier.padding(vertical = 16.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1507,11 +1534,70 @@ fun JamaahScreen(
                                     )
                                 }
                             }
+                            IconButton(onClick = { mulaiDaftarKartu(jamaah) }) {
+                                Icon(
+                                    Icons.Filled.CreditCard,
+                                    contentDescription = "Pasang kartu NFC ${jamaah.nama}",
+                                    tint = MaterialTheme.styles.primary
+                                )
+                            }
+                            IconButton(onClick = { jamaahToEdit = jamaah }) {
+                                Icon(
+                                    Icons.Filled.Edit,
+                                    contentDescription = "Edit ${jamaah.nama}",
+                                    tint = MaterialTheme.styles.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (modeDaftarKartu) {
+        jamaahNfcTarget?.let { target ->
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+                    CardContent(modifier = Modifier.padding(vertical = 24.dp)) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
                             Icon(
-                                Icons.Filled.Edit,
-                                contentDescription = "Edit",
-                                tint = MaterialTheme.styles.primary
+                                Icons.Filled.CreditCard,
+                                contentDescription = null,
+                                tint = MaterialTheme.styles.primary,
+                                modifier = Modifier.size(56.dp)
                             )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "Tempelkan kartu untuk ${target.nama}",
+                                style = MaterialTheme.komoTypography.title,
+                                color = MaterialTheme.styles.foreground,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Pastikan NFC aktif, lalu tempelkan kartu di belakang HP.",
+                                style = MaterialTheme.komoTypography.body,
+                                color = MaterialTheme.styles.mutedForeground,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(20.dp))
+                            Button(
+                                onClick = {
+                                    modeDaftarKartu = false
+                                    jamaahNfcTarget = null
+                                },
+                                variant = ButtonVariant.Outline,
+                                fullWidth = true
+                            ) {
+                                Text("Batal")
+                            }
                         }
                     }
                 }
