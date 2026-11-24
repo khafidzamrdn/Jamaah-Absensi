@@ -16,7 +16,8 @@ data class Jamaah(
     val nama: String = "",
     val kelas: String = "",
     val alamat: String = "",
-    val kategori: String = "Putra" // <-- FIELD BARU PEMISAH KATEGORI
+    val kategori: String = "Putra", // <-- FIELD BARU PEMISAH KATEGORI
+    val nfcUid: String = "" // UID kartu RFID 13,56 MHz yang terdaftar
 )
 
 data class Absensi(
@@ -53,7 +54,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             nama = doc.getString("nama") ?: "",
                             kelas = doc.getString("kelas") ?: "",
                             alamat = doc.getString("alamat") ?: "",
-                            kategori = doc.getString("kategori") ?: "Putra"
+                            kategori = doc.getString("kategori") ?: "Putra",
+                            nfcUid = doc.getString("nfcUid") ?: ""
                         )
                     }.sortedBy { it.nama }
                 }
@@ -81,7 +83,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun tambahJamaah(idSantri: String, nama: String, kelas: String, alamat: String, kategori: String) {
         viewModelScope.launch {
             try {
-                val data = mapOf("idSantri" to idSantri, "nama" to nama, "kelas" to kelas, "alamat" to alamat, "kategori" to kategori)
+                val data = mapOf("idSantri" to idSantri, "nama" to nama, "kelas" to kelas, "alamat" to alamat, "kategori" to kategori, "nfcUid" to "")
                 db.collection("jamaah").add(data).await()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -92,11 +94,63 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun perbaruiJamaah(jamaah: Jamaah) {
         viewModelScope.launch {
             try {
-                val data = mapOf("idSantri" to jamaah.idSantri, "nama" to jamaah.nama, "kelas" to jamaah.kelas, "alamat" to jamaah.alamat, "kategori" to jamaah.kategori)
+                val data = mapOf("idSantri" to jamaah.idSantri, "nama" to jamaah.nama, "kelas" to jamaah.kelas, "alamat" to jamaah.alamat, "kategori" to jamaah.kategori, "nfcUid" to jamaah.nfcUid)
                 db.collection("jamaah").document(jamaah.id).set(data).await()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    /** Mendaftarkan UID kartu NFC ke jamaah tertentu. UID yang sudah dipakai jamaah lain ditolak. */
+    suspend fun daftarkanNfc(jamaah: Jamaah, uid: String): String {
+        return try {
+            val cleanup = db.collection("jamaah").whereEqualTo("nfcUid", uid).get().await()
+            cleanup.documents.forEach {
+                if (it.id != jamaah.id) it.reference.update("nfcUid", "")
+            }
+            db.collection("jamaah").document(jamaah.id).update("nfcUid", uid).await()
+            "✅ Kartu NFC berhasil didaftarkan untuk ${jamaah.nama}."
+        } catch (e: Exception) {
+            "❌ Gagal mendaftarkan kartu: ${e.message}"
+        }
+    }
+
+    suspend fun hapusNfc(jamaah: Jamaah): String {
+        return try {
+            db.collection("jamaah").document(jamaah.id).update("nfcUid", "").await()
+            "Kartu NFC ${jamaah.nama} dihapus."
+        } catch (e: Exception) {
+            "❌ Gagal menghapus kartu: ${e.message}"
+        }
+    }
+
+    /** Memproses tap kartu: mencari jamaah berdasarkan UID, lalu menandai hadir pada sesi tersebut. */
+    suspend fun prosesTapNfc(uid: String, tanggal: String, waktu: String): String {
+        return try {
+            val jamaah = jamaahList.value.find { it.nfcUid.equals(uid, ignoreCase = true) }
+                ?: return "❌ Kartu '$uid' belum terdaftar. Daftarkan di menu Jamaah."
+
+            val query = db.collection("absensi")
+                .whereEqualTo("tanggal", tanggal)
+                .whereEqualTo("waktuShalat", waktu)
+                .whereEqualTo("jamaahId", jamaah.id)
+                .get()
+                .await()
+
+            if (query.isEmpty) return "❌ Sesi belum disiapkan."
+
+            val doc = query.documents[0]
+            if (doc.getString("status") == "Mengikuti") {
+                "⚠️ ${jamaah.nama} SUDAH absen."
+            } else {
+                doc.reference.update(
+                    mapOf("status" to "Mengikuti", "timestamp" to System.currentTimeMillis())
+                ).await()
+                "✅ ${jamaah.nama} HADIR!"
+            }
+        } catch (e: Exception) {
+            "❌ Terjadi kesalahan koneksi."
         }
     }
 
@@ -250,9 +304,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     Jamaah(idSantri = "QR003", nama = "Siti Aisyah", kelas = "B", alamat = "Pondok Putri", kategori = "Putri"),
                     Jamaah(idSantri = "QR004", nama = "Fatimah", kelas = "C", alamat = "Pondok Putri", kategori = "Putri")
                 )
-                dummies.forEach { 
+                dummies.forEach {
                     db.collection("jamaah").add(
-                        mapOf("idSantri" to it.idSantri, "nama" to it.nama, "kelas" to it.kelas, "alamat" to it.alamat, "kategori" to it.kategori)
+                        mapOf("idSantri" to it.idSantri, "nama" to it.nama, "kelas" to it.kelas, "alamat" to it.alamat, "kategori" to it.kategori, "nfcUid" to "")
                     ).await()
                 }
             } catch (e: Exception) {

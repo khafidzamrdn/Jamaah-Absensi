@@ -4,6 +4,12 @@
     <!-- IZIN KAMERA UNTUK SCAN QR -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- IZIN NFC UNTUK ABSENSI KARTU RFID 13,56 MHz -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature
+        android:name="android.hardware.nfc"
+        android:required="false" />
+
     <!-- IZIN NOTIFIKASI REKAP MINGGUAN -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

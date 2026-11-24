@@ -66,6 +66,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -126,6 +127,7 @@ import com.komoui.components.charts.LineSeries
 import com.komoui.themes.komoTypography
 import com.komoui.themes.styles
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -146,7 +148,16 @@ private fun formatTanggalSingkat(tanggal: String): String =
     if (tanggal.length >= 10) tanggal.substring(5).replace("-", "/") else tanggal
 
 @Composable
-fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: () -> Unit) {
+fun MainAppScreen(
+    viewModel: AppViewModel,
+    isDarkMode: Boolean,
+    onToggleTheme: () -> Unit,
+    nfcUid: SharedFlow<String>,
+    onNfcActiveChange: (Boolean) -> Unit,
+    onBukaPengaturanNfc: () -> Unit,
+    nfcTersedia: Boolean,
+    nfcAktif: Boolean
+) {
     var currentScreen by remember { mutableStateOf("Dashboard") }
     val icons = listOf(
         Icons.Filled.Home,
@@ -212,9 +223,11 @@ fun MainAppScreen(viewModel: AppViewModel, isDarkMode: Boolean, onToggleTheme: (
             ) { screen ->
                 when (screen) {
                     "Dashboard" -> DashboardScreen(viewModel) { currentScreen = "Absensi" }
-                    "Absensi" -> AbsensiScreen(viewModel)
+                    "Absensi" -> AbsensiScreen(
+                        viewModel, nfcUid, onNfcActiveChange, onBukaPengaturanNfc, nfcTersedia, nfcAktif
+                    )
                     "Rekap" -> RekapScreen(viewModel)
-                    "Jamaah" -> JamaahScreen(viewModel)
+                    "Jamaah" -> JamaahScreen(viewModel, nfcUid, onNfcActiveChange, nfcTersedia, nfcAktif)
                     "Pengaturan" -> PengaturanScreen(viewModel, isDarkMode, onToggleTheme)
                 }
             }
@@ -452,19 +465,34 @@ fun DashboardScreen(viewModel: AppViewModel, onMulaiAbsensi: () -> Unit) {
 }
 
 @Composable
-fun AbsensiScreen(viewModel: AppViewModel) {
+fun AbsensiScreen(
+    viewModel: AppViewModel,
+    nfcUid: SharedFlow<String>,
+    onNfcActiveChange: (Boolean) -> Unit,
+    onBukaPengaturanNfc: () -> Unit,
+    nfcTersedia: Boolean,
+    nfcAktif: Boolean
+) {
     var modeAbsensi by remember { mutableStateOf(0) }
     Column(modifier = Modifier.fillMaxSize()) {
         TabsList(
             selectedTabIndex = modeAbsensi,
             onTabSelected = { modeAbsensi = it },
-            tabs = listOf("Manual", "Scan Kamera"),
+            tabs = listOf("Manual", "Scan Kamera", "Scan NFC"),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
         )
-        if (modeAbsensi == 0) {
-            AbsensiManualView(viewModel, Modifier.weight(1f))
-        } else {
-            AbsensiScanView(viewModel, Modifier.weight(1f))
+        when (modeAbsensi) {
+            0 -> AbsensiManualView(viewModel, Modifier.weight(1f))
+            1 -> AbsensiScanView(viewModel, Modifier.weight(1f))
+            else -> AbsensiNfcView(
+                viewModel = viewModel,
+                nfcUidFlow = nfcUid,
+                onNfcActiveChange = onNfcActiveChange,
+                onBukaPengaturanNfc = onBukaPengaturanNfc,
+                nfcTersedia = nfcTersedia,
+                nfcAktif = nfcAktif,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -1172,8 +1200,15 @@ private fun RekapJamaahCard(
 }
 
 @Composable
-fun JamaahScreen(viewModel: AppViewModel) {
+fun JamaahScreen(
+    viewModel: AppViewModel,
+    nfcUid: SharedFlow<String>,
+    onNfcActiveChange: (Boolean) -> Unit,
+    nfcTersedia: Boolean,
+    nfcAktif: Boolean
+) {
     val jamaahList by viewModel.jamaahList.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
     var idSantri by remember { mutableStateOf("") }
     var nama by remember { mutableStateOf("") }
     var kelas by remember { mutableStateOf("") }
@@ -1188,6 +1223,24 @@ fun JamaahScreen(viewModel: AppViewModel) {
         var editKelas by remember(current.id) { mutableStateOf(current.kelas) }
         var editAlamat by remember(current.id) { mutableStateOf(current.alamat) }
         var editKategori by remember(current.id) { mutableStateOf(current.kategori) }
+        var editNfcUid by remember(current.id) { mutableStateOf(current.nfcUid) }
+        var modeDaftarKartu by remember(current.id) { mutableStateOf(false) }
+        var infoKartu by remember(current.id) { mutableStateOf("") }
+
+        DisposableEffect(modeDaftarKartu) {
+            onNfcActiveChange(modeDaftarKartu)
+            onDispose { onNfcActiveChange(false) }
+        }
+
+        LaunchedEffect(modeDaftarKartu) {
+            if (!modeDaftarKartu) return@LaunchedEffect
+            nfcUid.collect { uid ->
+                val terbaru = jamaahList.find { it.id == current.id } ?: current
+                infoKartu = viewModel.daftarkanNfc(terbaru, uid)
+                if (infoKartu.startsWith("✅")) editNfcUid = uid
+                modeDaftarKartu = false
+            }
+        }
 
         Dialog(
             open = true,
@@ -1242,6 +1295,59 @@ fun JamaahScreen(viewModel: AppViewModel) {
                     RadioButtonWithLabel(value = "Putra", label = "Putra")
                     RadioButtonWithLabel(value = "Putri", label = "Putri")
                 }
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Kartu RFID (NFC 13,56 MHz)",
+                    style = MaterialTheme.komoTypography.labelMedium,
+                    color = MaterialTheme.styles.mutedForeground
+                )
+                Text(
+                    if (editNfcUid.isBlank()) "Belum ada kartu terdaftar."
+                    else "UID terdaftar: $editNfcUid",
+                    style = MaterialTheme.komoTypography.body,
+                    color = MaterialTheme.styles.foreground
+                )
+                Spacer(Modifier.height(8.dp))
+                if (!nfcTersedia || !nfcAktif) {
+                    Text(
+                        "NFC tidak tersedia atau belum aktif di perangkat ini.",
+                        style = MaterialTheme.komoTypography.label,
+                        color = MaterialTheme.styles.destructive
+                    )
+                } else {
+                    Button(
+                        onClick = { modeDaftarKartu = true },
+                        enabled = !modeDaftarKartu,
+                        loading = modeDaftarKartu,
+                        fullWidth = true
+                    ) {
+                        Text(if (modeDaftarKartu) "Tempelkan kartu sekarang..." else "Daftarkan Kartu Baru")
+                    }
+                }
+                if (editNfcUid.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                infoKartu = viewModel.hapusNfc(current)
+                                editNfcUid = ""
+                            }
+                        },
+                        variant = ButtonVariant.Outline,
+                        fullWidth = true
+                    ) {
+                        Text("Hapus Kartu")
+                    }
+                }
+                if (infoKartu.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        infoKartu,
+                        style = MaterialTheme.komoTypography.label,
+                        color = if (infoKartu.startsWith("✅")) MaterialTheme.styles.primary
+                        else MaterialTheme.styles.destructive
+                    )
+                }
             },
             footer = {
                 Button(
@@ -1266,7 +1372,8 @@ fun JamaahScreen(viewModel: AppViewModel) {
                                 nama = editNama,
                                 kelas = editKelas,
                                 alamat = editAlamat,
-                                kategori = editKategori
+                                kategori = editKategori,
+                                nfcUid = editNfcUid
                             )
                         )
                         jamaahToEdit = null
@@ -1392,6 +1499,13 @@ fun JamaahScreen(viewModel: AppViewModel) {
                                     style = MaterialTheme.komoTypography.label,
                                     color = MaterialTheme.styles.mutedForeground
                                 )
+                                if (jamaah.nfcUid.isNotBlank()) {
+                                    Text(
+                                        "NFC: ${jamaah.nfcUid}",
+                                        style = MaterialTheme.komoTypography.label,
+                                        color = MaterialTheme.styles.primary
+                                    )
+                                }
                             }
                             Icon(
                                 Icons.Filled.Edit,

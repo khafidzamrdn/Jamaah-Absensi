@@ -1,6 +1,6 @@
 # Jamaah-Absensi
 
-Aplikasi pencatatan absensi jamaah shalat 5 waktu. Dibuat khusus untuk pengujian offline tanpa database online.
+Aplikasi pencatatan absensi jamaah shalat 5 waktu dengan penyimpanan realtime Firebase Firestore.
 
 ## Download APK
 Siapa pun bisa langsung mengunduh APK terbaru tanpa perlu login:
@@ -10,6 +10,8 @@ Siapa pun bisa langsung mengunduh APK terbaru tanpa perlu login:
 ## Fitur
 - Manajemen Data Jamaah (Tambah, Hapus, Lihat).
 - Pencatatan Absensi 5 Waktu Shalat (Mengikuti, Ijin, Tidak Mengikuti, Telat).
+- Tiga metode absensi: manual, scan QR code, dan **tap kartu RFID/NFC 13,56 MHz**.
+- Pendaftaran UID kartu NFC per jamaah lewat menu **Jamaah → Edit → Daftarkan Kartu Baru**.
 - Pencegahan Absensi Ganda.
 - Dashboard Statistik Harian.
 - Pengaturan (Reset Data).
@@ -17,7 +19,8 @@ Siapa pun bisa langsung mengunduh APK terbaru tanpa perlu login:
 ## Teknologi
 - Kotlin
 - Jetpack Compose
-- Room Database (Local Storage)
+- Firebase Firestore (Database realtime)
+- NFC (ISO14443A/B, Mifare, Felica, ISO15693)
 - GitHub Actions (CI/CD)
 
 ## Cara Build APK via GitHub (Lewat HP)
