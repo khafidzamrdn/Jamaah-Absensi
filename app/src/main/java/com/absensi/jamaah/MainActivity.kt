@@ -3,7 +3,6 @@ package com.absensi.jamaah
 import android.Manifest
 import android.content.pm.PackageManager
 import android.nfc.NfcAdapter
-import android.nfc.Tag
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -31,9 +30,14 @@ class MainActivity : ComponentActivity() {
     ) { }
 
     private var nfcAdapter: NfcAdapter? = null
-    private var nfcPendingIntent: android.app.PendingIntent? = null
     private var nfcDidengarkan = false
     private var nfcAktifState by mutableStateOf(false)
+
+    private val readerFlags = NfcAdapter.FLAG_READER_NFC_A or
+        NfcAdapter.FLAG_READER_NFC_B or
+        NfcAdapter.FLAG_READER_NFC_F or
+        NfcAdapter.FLAG_READER_NFC_V or
+        NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK
 
     /** Kartu NFC yang terbaca; dikonsumsi oleh layar Absensi NFC / pendaftaran kartu. */
     val nfcUid = kotlinx.coroutines.flow.MutableSharedFlow<String>(
@@ -45,13 +49,19 @@ class MainActivity : ComponentActivity() {
         nfcDidengarkan = enabled
         val adapter = nfcAdapter
         if (enabled && adapter != null && adapter.isEnabled) {
-            val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            val flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) android.app.PendingIntent.FLAG_IMMUTABLE else 0
-            nfcPendingIntent = android.app.PendingIntent.getActivity(this, 0, intent, flags)
-            adapter.enableForegroundDispatch(this, nfcPendingIntent, null, teknologiNfc())
+            // Reader mode mengambil alih NFC secara eksklusif, sehingga kartu tidak
+            // dilempar ke aplikasi e-wallet / pembayaran bawaan HP.
+            adapter.enableReaderMode(
+                this,
+                { tag ->
+                    val uid = formatUidNfc(tag)
+                    if (uid.isNotBlank()) nfcUid.tryEmit(uid)
+                },
+                readerFlags,
+                null
+            )
         } else {
-            adapter?.disableForegroundDispatch(this)
+            adapter?.disableReaderMode(this)
         }
     }
 
@@ -98,15 +108,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-        }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
-        if (tag != null) {
-            val uid = formatUidNfc(tag)
-            if (uid.isNotBlank()) nfcUid.tryEmit(uid)
         }
     }
 
